@@ -7,6 +7,14 @@ import json
 import functools
 import time
 import random
+def compose_two(func1, func2):
+     def composition(*args, **kwargs):
+        return func1(func2(*args, **kwargs))
+     return composition
+def compose(*funcs):
+    return functools.reduce(compose_two, funcs)
+def pipe(*funcs):
+    return functools.reduce(compose_two, reversed(funcs))
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()
@@ -15,9 +23,39 @@ def timeit(method):
         print('%r %f sec' %(method.__name__, te-ts))
         return result
     return timed
+def merge_two_dicts(x, y):
+    """Given two dicts, merge them into a new dict as a shallow copy."""
+    z = x.copy()
+    z.update(y)
+    return z
+def var_namer(num, prefix):
+    return prefix+'_'+str(num)
+def add_sensers(sensers, mappers, reducers,graph):
+    sensers = {k: {'children':[mappers[idx]]} for idx, k in enumerate(sensers)}
+    return merge_two_dicts(graph, sensers)
+def add_mappers(sensers, mappers, reducers,graph):
+    mappers = {k:{'children':reducers, 'parents':sensers[idx]} for idx, k in enumerate(mappers)}
+    return merge_two_dicts(graph, mappers)
+def add_reducers(sensers, mappers, reducers,graph):
+    reducers = {k: {'children':['K'],'parents':mappers} for idx, k in enumerate(reducers)}
+    return merge_two_dicts(graph, reducers)
+def add_sink(sensers, mappers, reducers, graph):
+    sink = {'K':{'children':[], 'parents':reducers}}
+    return merge_two_dicts(graph, sink)
+def get_num_sensors(code):
+    return 2
+def get_num_reducers(code):
+    return 2
 def generate_graph(code_class):
-    num_sensors = 4
-    num_reducers = 6
+    num_sensors = get_num_sensors(code_class)
+    num_reducers = get_num_reducers(code_class)
+    sensers = [var_namer(i, 'S') for i in range(num_sensors)]
+    mappers = [var_namer(i, 'M') for i in range(num_sensors)]
+    reducers = [var_namer(i, 'R') for i in range(num_reducers)]
+    chain = [add_sensers, add_mappers, add_reducers, add_sink]
+    paramed_chain = [functools.partial(i, sensers, mappers, reducers) for i in chain]
+    init_graph = {}
+    graph = pipe(*paramed_chain)(init_graph)
     return graph
 
 graph = {'A': {'children':['D'],'parents':[], 'node_w':4, 'edge_w':10},
@@ -195,6 +233,7 @@ def formulate_LP(graph, constraints, processors, rssi):
 @timeit
 def solver(p):
     return p.solve()
+"""
 p = formulate_LP(graph, constraints, processors, rssi)
 solved = solver(p)
 cost_calculator = functools.partial(find_cost, graph, processors, rssi)
@@ -208,3 +247,4 @@ chosen = [max(i, key = get_val) for i in grouped]
 print(grouped)
 print(pulp.LpStatus[p.status])
 print(pulp.value(p.objective))
+"""
