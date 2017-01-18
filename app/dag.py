@@ -46,6 +46,8 @@ def get_num_sensors(code):
     return 2
 def get_num_reducers(code):
     return 2
+def profile_cost(function):
+    return {'node_w:'10, 'edge_w':4}
 def generate_graph(code_class):
     num_sensors = get_num_sensors(code_class)
     num_reducers = get_num_reducers(code_class)
@@ -57,6 +59,10 @@ def generate_graph(code_class):
     init_graph = {}
     graph = pipe(*paramed_chain)(init_graph)
     return graph
+def add_weights(code_class):
+    steps = {'S':code_class.senser, 'M':code_class.mapper, 'R':code_class.reducer}
+    weights = {k:profile_cost(v) for k,v in steps.items()}
+    return weights
 
 graph = {'A': {'children':['D'],'parents':[], 'node_w':4, 'edge_w':10},
          'B': {'children':['E'],'parents':[], 'node_w':4, 'edge_w':10},
