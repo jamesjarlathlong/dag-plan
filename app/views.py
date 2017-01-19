@@ -1,21 +1,24 @@
 from app import app
 from flask import (Flask, request, Response)
 import json
+import functools
 import app.dag_former as dag_former
 import app.dag_solver as dag_solver
-graph = dag_former.generate_weighted_graph('code')
-constraints = dag_former.generate_constraints('code', graph)
-print(constraints)
+
 @app.route('/solve', methods=['POST'])
 def solve():
-	code = request.data
+	code = request.json.code
+	solution = solve_LP(code)
+	return Response(json.dumps({'res':solution}), status = 200)
+def solve_LP(code):
 	graph = dag_former.generate_weighted_graph(code)
+	print(graph)
 	constraints = dag_former.generate_constraints(code, graph)
+	total_num = 10
 	rssi = create_rssi(total_num)
 	processors = create_processors(total_num)
-	print('called: ', data)
-	return Response(json.dumps({'res':4}), status = 200, )
-
+	solution = dag_solver.solution_pipe(graph, constraints, processors, rssi)
+	return solution
 def create_processors(total_num):
     def processor_power(num):
         if num==0:
@@ -33,3 +36,5 @@ def create_rssi(total_num):
         return{j:rssi(i,j) for j in range(total)}
     other_gen = functools.partial(to_others,total_num)
     return{i:other_gen(i) for i in range(total_num)}
+sol = solve_LP('a')
+print('sol: ', sol)
