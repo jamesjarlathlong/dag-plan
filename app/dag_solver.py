@@ -6,6 +6,7 @@ import json
 import functools
 import time
 import random
+import app.helper as helper
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()
@@ -25,7 +26,7 @@ def dummy_namer(tupl):
 def lazy_flattener(listoflists):
     return itertools.chain(*listoflists)
 def find_node_edges(nodekey,nodevalue):
-    return itertools.product(nodekey, nodevalue['children'])
+    return itertools.product([nodekey], nodevalue['children'])
 def find_graph_edges(graph):
     """given a dictionary representation of a graph
     generate a list of the graph edges as tuples"""
@@ -40,6 +41,7 @@ def find_edgechildren(edge,constraints):
     parent_node = edge[1]
     return constraints[parent_node]
 def combination_finder(edge, constraints):
+
     return ([edge], find_edgeparents(edge,constraints), find_edgechildren(edge,constraints))
 def timed_product(*args):
     return itertools.product(*args)
@@ -153,7 +155,8 @@ def formulate_LP(graph, constraints, processors, rssi):
     return problem
 @timeit
 def solver(p):
-    return p.solve()
+    res = p.solve()
+    return p
 
 def output(solution):
     all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
@@ -163,4 +166,8 @@ def output(solution):
         return tupl[0].split(',_parent')[0]
     grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
     chosen = [max(i, key = get_val) for i in grouped]
-    return chosen
+    converted = [i[0]for i in chosen]
+    return converted
+
+solution_pipe = helper.pipe(formulate_LP, solver, output)
+
