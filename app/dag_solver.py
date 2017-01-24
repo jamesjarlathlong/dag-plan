@@ -147,7 +147,7 @@ def formulate_LP(graph, constraints, processors, rssi):
     d_gen = functools.partial(generate_dummies, graph, constraints)
     d = create_list_from_gen(d_gen())
     problem = pulp.LpProblem("DAG",pulp.LpMinimize)
-    dummy_vars = pulp.LpVariable.dicts("Sensor",d,0, 1, 'Binary')
+    dummy_vars = pulp.LpVariable.dicts("Sensor", d,0, 1, 'Binary')
     cost_calculator = functools.partial(find_cost, graph, processors, rssi)
     problem = add_cost_function(problem, d, dummy_vars, cost_calculator)
     problem = edge_uniqueness(problem, d, dummy_vars)
@@ -157,17 +157,27 @@ def formulate_LP(graph, constraints, processors, rssi):
 def solver(p):
     res = p.solve()
     return p
-
+def to_tuples(str):
+    no_unders = str.replace(',_',', ')
+    Sensor_Assignment = collections.namedtuple('Sensor_Assignment', 'edge parent child')
+    exec('tpl = '+no_unders)
+    return locals()['tpl']
+def get_val(tupl):
+    return tupl[1]
+def keyfunct(tupl):
+    return tupl[0].split(',_parent')[0]
+def get_level(named_tpl):
+    print('named: ', named_tpl.edge)
+    return named_tpl.edge[0].split('_')[0]
 def output(solution):
     all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
-    def get_val(tupl):
-        return tupl[1]
-    def keyfunct(tupl):
-        return tupl[0].split(',_parent')[0]
     grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
     chosen = [max(i, key = get_val) for i in grouped]
-    converted = [i[0]for i in chosen]
-    return converted
+    converted = [to_tuples(i[0]) for i in chosen]
+    grouped_by_level = {k:list(g) for k,g in itertools.groupby(converted, get_level)}
+    print('grouped: ', grouped_by_level)
+    chosen_parents = {k:[i.parent for i in g] for k,g in grouped_by_level.items()}
+    return chosen_parents
 
 solution_pipe = helper.pipe(formulate_LP, solver, output)
 
