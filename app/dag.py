@@ -1,4 +1,3 @@
-import asyncio
 import itertools
 import collections
 import random
@@ -7,71 +6,7 @@ import json
 import functools
 import time
 import random
-def compose_two(func1, func2):
-     def composition(*args, **kwargs):
-        return func1(func2(*args, **kwargs))
-     return composition
-def compose(*funcs):
-    return functools.reduce(compose_two, funcs)
-def pipe(*funcs):
-    return functools.reduce(compose_two, reversed(funcs))
-def timeit(method):
-    def timed(*args, **kw):
-        ts = time.time()
-        result = method(*args, **kw)
-        te = time.time()
-        print('%r %f sec' %(method.__name__, te-ts))
-        return result
-    return timed
-def merge_two_dicts(x, y):
-    """Given two dicts, merge them into a new dict as a shallow copy."""
-    z = x.copy()
-    z.update(y)
-    return z
-def var_namer(num, prefix):
-    return prefix+'_'+str(num)
-def add_sensers(sensers, mappers, reducers,graph):
-    sensers = {k: {'children':[mappers[idx]]} for idx, k in enumerate(sensers)}
-    return merge_two_dicts(graph, sensers)
-def add_mappers(sensers, mappers, reducers,graph):
-    mappers = {k:{'children':reducers, 'parents':sensers[idx]} for idx, k in enumerate(mappers)}
-    return merge_two_dicts(graph, mappers)
-def add_reducers(sensers, mappers, reducers,graph):
-    reducers = {k: {'children':['K'],'parents':mappers} for idx, k in enumerate(reducers)}
-    return merge_two_dicts(graph, reducers)
-def add_sink(sensers, mappers, reducers, graph):
-    sink = {'K':{'children':[], 'parents':reducers}}
-    return merge_two_dicts(graph, sink)
-def get_num_sensors(code):
-    return 2
-def get_num_reducers(code):
-    return 2
-def profile_cost(function):
-    return {'node_w:'10, 'edge_w':4}
-def generate_graph(code_class):
-    num_sensors = get_num_sensors(code_class)
-    num_reducers = get_num_reducers(code_class)
-    sensers = [var_namer(i, 'S') for i in range(num_sensors)]
-    mappers = [var_namer(i, 'M') for i in range(num_sensors)]
-    reducers = [var_namer(i, 'R') for i in range(num_reducers)]
-    chain = [add_sensers, add_mappers, add_reducers, add_sink]
-    paramed_chain = [functools.partial(i, sensers, mappers, reducers) for i in chain]
-    init_graph = {}
-    graph = pipe(*paramed_chain)(init_graph)
-    return graph
-def add_weights(code_class):
-    steps = {'S':code_class.senser, 'M':code_class.mapper, 'R':code_class.reducer}
-    weights = {k:profile_cost(v) for k,v in steps.items()}
-    return weights
 
-graph = {'A': {'children':['D'],'parents':[], 'node_w':4, 'edge_w':10},
-         'B': {'children':['E'],'parents':[], 'node_w':4, 'edge_w':10},
-         'C': {'children':['F'],'parents':[], 'node_w':4, 'edge_w':10},
-         'D': {'children':['G'],'parents':['A'], 'node_w':20, 'edge_w':2},
-         'E': {'children':['G'],'parents':['B'], 'node_w':20, 'edge_w':2},
-         'F': {'children':['G'],'parents':['C'], 'node_w':20, 'edge_w':2},
-         'G': {'children':['H'],'parents':['D','E','F'], 'node_w':30, 'edge_w':1},
-         'H': {'children':[],'parent':['G'], 'node_w':0, 'edge_w':0}}
 def create_processors(total_num):
     def processor_power(num):
         if num==0:
@@ -239,18 +174,13 @@ def formulate_LP(graph, constraints, processors, rssi):
 @timeit
 def solver(p):
     return p.solve()
-"""
-p = formulate_LP(graph, constraints, processors, rssi)
-solved = solver(p)
-cost_calculator = functools.partial(find_cost, graph, processors, rssi)
-all_nonzero = [(v.name,v.varValue) for v in p.variables() if v.varValue >0]
-def keyfunct(tupl):
-    return tupl[0].split(',_parent')[0]
-grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
-def get_val(tupl):
-    return tupl[1]
-chosen = [max(i, key = get_val) for i in grouped]
-print(grouped)
-print(pulp.LpStatus[p.status])
-print(pulp.value(p.objective))
-"""
+
+def output(solution):
+    all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
+    def get_val(tupl):
+        return tupl[1]
+    def keyfunct(tupl):
+        return tupl[0].split(',_parent')[0]
+    grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
+    chosen = [max(i, key = get_val) for i in grouped]
+    return chosen
