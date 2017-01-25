@@ -6,6 +6,7 @@ import json
 import functools
 import time
 import random
+import app.helper as helper
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()
@@ -25,7 +26,7 @@ def dummy_namer(tupl):
 def lazy_flattener(listoflists):
     return itertools.chain(*listoflists)
 def find_node_edges(nodekey,nodevalue):
-    return itertools.product(nodekey, nodevalue['children'])
+    return itertools.product([nodekey], nodevalue['children'])
 def find_graph_edges(graph):
     """given a dictionary representation of a graph
     generate a list of the graph edges as tuples"""
@@ -40,6 +41,7 @@ def find_edgechildren(edge,constraints):
     parent_node = edge[1]
     return constraints[parent_node]
 def combination_finder(edge, constraints):
+
     return ([edge], find_edgeparents(edge,constraints), find_edgechildren(edge,constraints))
 def timed_product(*args):
     return itertools.product(*args)
@@ -145,7 +147,7 @@ def formulate_LP(graph, constraints, processors, rssi):
     d_gen = functools.partial(generate_dummies, graph, constraints)
     d = create_list_from_gen(d_gen())
     problem = pulp.LpProblem("DAG",pulp.LpMinimize)
-    dummy_vars = pulp.LpVariable.dicts("Sensor",d,0, 1, 'Binary')
+    dummy_vars = pulp.LpVariable.dicts("Sensor", d,0, 1, 'Binary')
     cost_calculator = functools.partial(find_cost, graph, processors, rssi)
     problem = add_cost_function(problem, d, dummy_vars, cost_calculator)
     problem = edge_uniqueness(problem, d, dummy_vars)
@@ -153,14 +155,29 @@ def formulate_LP(graph, constraints, processors, rssi):
     return problem
 @timeit
 def solver(p):
-    return p.solve()
-
+    res = p.solve()
+    return p
+def to_tuples(str):
+    no_unders = str.replace(',_',', ')
+    Sensor_Assignment = collections.namedtuple('Sensor_Assignment', 'edge parent child')
+    exec('tpl = '+no_unders)
+    return locals()['tpl']
+def get_val(tupl):
+    return tupl[1]
+def keyfunct(tupl):
+    return tupl[0].split(',_parent')[0]
+def get_level(named_tpl):
+    print('named: ', named_tpl.edge)
+    return named_tpl.edge[0].split('_')[0]
 def output(solution):
     all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
-    def get_val(tupl):
-        return tupl[1]
-    def keyfunct(tupl):
-        return tupl[0].split(',_parent')[0]
     grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
     chosen = [max(i, key = get_val) for i in grouped]
-    return chosen
+    converted = [to_tuples(i[0]) for i in chosen]
+    grouped_by_level = {k:list(g) for k,g in itertools.groupby(converted, get_level)}
+    print('grouped: ', grouped_by_level)
+    chosen_parents = {k:[i.parent for i in g] for k,g in grouped_by_level.items()}
+    return chosen_parents
+
+solution_pipe = helper.pipe(formulate_LP, solver, output)
+
