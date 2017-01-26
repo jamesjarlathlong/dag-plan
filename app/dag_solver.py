@@ -166,18 +166,34 @@ def get_val(tupl):
     return tupl[1]
 def keyfunct(tupl):
     return tupl[0].split(',_parent')[0]
-def get_level(named_tpl):
-    print('named: ', named_tpl.edge)
-    return named_tpl.edge[0].split('_')[0]
+def get_level(node_assignment_tpl):
+    level = node_assignment_tpl[0].split('_')[0]
+    print('level: ', level)
+    return level
+def get_node_order(tpl):
+    return tpl[0].split('_')[1]
+def sortbynode(lst):
+    return sorted(lst, key=get_node_order)
+def tuple_to_kv(tpl):
+    edge = tpl.edge
+    yield (edge[0], tpl.parent)
+    yield (edge[1], tpl.child)
+def tuples_to_node_assignment_pairs(tuples):
+    all_tuples = lazy_flattener(tuple_to_kv(tpl) for tpl in tuples)
+    node_assignment_pairs = {k:v for k,v in all_tuples}
+    print('pairs: ', node_assignment_pairs)
+    return sorted([(k,v) for k,v in node_assignment_pairs.items()], key=get_level)
 def output(solution):
     all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
     grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
     chosen = [max(i, key = get_val) for i in grouped]
     converted = [to_tuples(i[0]) for i in chosen]
-    grouped_by_level = {k:list(g) for k,g in itertools.groupby(converted, get_level)}
+    node_assignment_pairs = tuples_to_node_assignment_pairs(converted)
+    print('node_assignment_pairs: ', node_assignment_pairs)
+    grouped_by_level = {k:list(g) for k,g in itertools.groupby(node_assignment_pairs, get_level)}
     print('grouped: ', grouped_by_level)
-    chosen_parents = {k:[i.parent for i in g] for k,g in grouped_by_level.items()}
-    return chosen_parents
+    chosen = {k: [i[1] for i in sortbynode(g)] for k,g in grouped_by_level.items()}
+    return chosen
 
 solution_pipe = helper.pipe(formulate_LP, solver, output)
 
