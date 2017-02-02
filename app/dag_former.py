@@ -1,5 +1,6 @@
 import functools
 import app.helper as helper
+from app.node_emulator import job_profiler
 def var_namer(num, prefix):
     return prefix+'_'+str(num)
 def add_sensers(sensers, mappers, reducers,graph):
@@ -49,27 +50,40 @@ def generate_graph_structure(code_class):
     graph = helper.pipe(*paramed_chain)(init_graph)
     return graph
 
-class dummy:
-    def __init__(self):
-        self.sensenodes = [[0,1], [1,4]]
-        self.mapnodes = [[0,1,3], [1,4,5]]
-        self.reducenodes = [[0], [1]]
-    def senser(self):
-        pass
-    def mapper(self):
-        pass
-    def reducer(self):
-        pass
+
 def define_the_class(code):
-    dummy_class = dummy()
-    return dummy_class
+    dummy_code = """class SenseReduce:
+    def __init__(self):
+        self.sensenodes = [[1],[2]]
+        self.mapnodes = [[0,1,2],[0,1,2]]
+        self.reducenodes = [[0,1,2]]
+    def sampler(self,node):
+        acc = yield from node.accel(2) ###a lot of data
+        return acc
+    def mapper(self,node,d):
+        import time
+        time.sleep(1)
+        avgs = {k: round(sum(v)/len(v),2) 
+                for k,v in d.items()} #just avg
+        yield(node.ID,avgs)#a much smaller amount of data
+    def reducer(self,node,k,vs):
+        yield(k,vs) #no reduction from map""" 
+    exec(dummy_code)
+    return locals()['SenseReduce']()
 def get_weights(code_class):
-    steps = {'S':code_class.senser, 'M':code_class.mapper, 'R':code_class.reducer, 'K':lambda: None}
-    weights = {k:profile_cost(v) for k,v in steps.items()}
+    code_instance = define_the_class(code_class)
+    weights = job_profiler(code_instance)
+    print('weights: ', weights)
     return weights
-def add_weights_to_graph(weights, graph):
-    new_graph = {k:helper.merge_two_dicts(v, weights[node_type(k)]) for k,v in graph.items()}
-    return new_graph
+def add_weights_to_graph(weights_structure, graph):
+    weights_structure['K'] = {0:{'cost':0, 'edge':{}}}
+    for node, description in graph.items():
+        node_level, node_idx = node.split('_')
+        node_idx = int(node_idx)
+        graph[node]['node_w'] = weights_structure[node_level][node_idx]['cost']
+        graph[node]['edge_w'] = weights_structure[node_level][node_idx].get('edge',{})
+    #new_graph = {k:helper.merge_two_dicts(v, weights[node_type(k)]) for k,v in graph.items()}
+    return graph
 
 def generate_weighted_graph(code):
     code_class = define_the_class(code)

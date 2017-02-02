@@ -7,14 +7,6 @@ import functools
 import time
 import random
 import app.helper as helper
-def timeit(method):
-    def timed(*args, **kw):
-        ts = time.time()
-        result = method(*args, **kw)
-        te = time.time()
-        print('%r %f sec' %(method.__name__, te-ts))
-        return result
-    return timed
 def find_communication_power(a, b, rssi):
     """a and b are the names of processor"""
     return rssi[a][b]
@@ -41,20 +33,19 @@ def find_edgechildren(edge,constraints):
     parent_node = edge[1]
     return constraints[parent_node]
 def combination_finder(edge, constraints):
-
     return ([edge], find_edgeparents(edge,constraints), find_edgechildren(edge,constraints))
 def timed_product(*args):
     return itertools.product(*args)
-@timeit
 def unroll(combination_generator):
     return (dummy_namer(comb) for product in combination_generator
             for comb in product)
-@timeit
 def generate_dummies(graph, constraints):
     """generate a dummy variable named tuple for each
     valid combination of edge, assigned parent, assigned child"""
-    edges = find_graph_edges(graph)
-    edge_possibilities = (combination_finder(edge,constraints) for edge in edges)
+    edges = list(find_graph_edges(graph))
+    print('edges: ', edges)
+    edge_possibilities = [combination_finder(edge,constraints) for edge in edges]
+    print('poss: ', edge_possibilities)
     combination_generator = (timed_product(*edge) for edge in edge_possibilities)
     all_dummies = unroll(combination_generator)
     return all_dummies
@@ -74,9 +65,13 @@ def find_cost(graph, processors, rssi, a_dummy):
     parent = a_dummy.parent
     child = a_dummy.child
     comp_cost = parent_node['node_w']/processors[parent]
-    comm_cost_next = child_node['edge_w']/rssi[parent][child]
+    child_node_name = a_dummy.edge[1]
+    child_node_idx = int(child_node_name.split('_')[1])
+    comm_size = parent_node['edge_w'].get(child_node_idx,0)
+    comm_cost_next = comm_size/rssi[parent][child]
+    print('p,c: ', a_dummy, comp_cost+comm_cost_next)
     return comp_cost+comm_cost_next
-@timeit
+
 def edge_uniqueness(problem, dummies, dummy_vars):
     """given all possible dummy variable assignments
     and the ILP problem, create the constraints that 
@@ -130,19 +125,21 @@ def all_inconsistents(graph, dummies):
     catcher = functools.partial(edgepair_inconsistents, dummies)
     wrong_nodes = lazy_flattener((catcher(*i) for i in edge_pairs))
     return wrong_nodes
-@timeit
-def inout_consistency(graph, dummies, problem, dummy_vars):
+
+def inout_consistency(graph, dummies, p, dummy_vars):
     all_matchers = all_inconsistents(graph, dummies)
+    print('all_matchers: ', all_matchers)
     for inconsistent_pair in all_matchers:
         description = json.dumps(inconsistent_pair)
         added_dummy_vars = [dummy_vars[i] for i in inconsistent_pair]
-        problem += (pulp.lpSum(added_dummy_vars)<=1,
+        p += (pulp.lpSum(added_dummy_vars)<=1,
         "pick one of mutex pair: "+description)
+    print('adding mutex:,', problem)
     return problem
-@timeit
+
 def create_list_from_gen(gen):
     return list(gen)
-@timeit
+
 def formulate_LP(graph, constraints, processors, rssi):
     d_gen = functools.partial(generate_dummies, graph, constraints)
     d = create_list_from_gen(d_gen())
@@ -152,8 +149,9 @@ def formulate_LP(graph, constraints, processors, rssi):
     problem = add_cost_function(problem, d, dummy_vars, cost_calculator)
     problem = edge_uniqueness(problem, d, dummy_vars)
     problem = inout_consistency(graph, d_gen(), problem, dummy_vars)
+    print('problem: ', problem)
     return problem
-@timeit
+
 def solver(p):
     res = p.solve()
     return p
@@ -168,7 +166,6 @@ def keyfunct(tupl):
     return tupl[0].split(',_parent')[0]
 def get_level(node_assignment_tpl):
     level = node_assignment_tpl[0].split('_')[0]
-    print('level: ', level)
     return level
 def get_node_order(tpl):
     return tpl[0].split('_')[1]
@@ -185,13 +182,12 @@ def tuples_to_node_assignment_pairs(tuples):
     return sorted([(k,v) for k,v in node_assignment_pairs.items()], key=get_level)
 def output(solution):
     all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
+    print('all nonzero: ', all_nonzero)
     grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
     chosen = [max(i, key = get_val) for i in grouped]
     converted = [to_tuples(i[0]) for i in chosen]
     node_assignment_pairs = tuples_to_node_assignment_pairs(converted)
-    print('node_assignment_pairs: ', node_assignment_pairs)
     grouped_by_level = {k:list(g) for k,g in itertools.groupby(node_assignment_pairs, get_level)}
-    print('grouped: ', grouped_by_level)
     chosen = {k: [i[1] for i in sortbynode(g)] for k,g in grouped_by_level.items()}
     return chosen
 

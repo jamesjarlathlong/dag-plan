@@ -12,27 +12,24 @@ def solve():
 	return Response(json.dumps({'res':solution}), status = 200)
 def solve_LP(code):
 	graph = dag_former.generate_weighted_graph(code)
-	print(graph)
+	print('graph: ', graph)
 	constraints = dag_former.generate_constraints(code, graph)
-	total_num = 10
+	total_num = 3
 	rssi = create_rssi(total_num)
 	processors = create_processors(total_num)
 	solution = dag_solver.solution_pipe(graph, constraints, processors, rssi)
 	return solution
 def create_processors(total_num):
-    def processor_power(num):
-        if num==0:
-            return 10**5
-        else:
-            return 2*num
-    return {i:processor_power(i) for i in range(total_num)}
+    return {0:30000, 1:10, 2:10,3:10,4:10,5:10}
 def create_rssi(total_num):
     def to_others(total,i):
         def rssi(i,j):
             if i==j:
-                return 10**6
+                return 1000
+            elif j==0:
+                return 900
             else:
-                return 10
+                return 500
         return{j:rssi(i,j) for j in range(total)}
     other_gen = functools.partial(to_others,total_num)
     return{i:other_gen(i) for i in range(total_num)}
