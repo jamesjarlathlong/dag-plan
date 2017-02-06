@@ -12,9 +12,8 @@ def solve():
 	return Response(json.dumps({'res':solution}), status = 200)
 def solve_LP(code):
 	graph = dag_former.generate_weighted_graph(code)
-	print('graph: ', graph)
 	constraints = dag_former.generate_constraints(code, graph)
-	total_num = 3
+	total_num = 10
 	rssi = create_rssi(total_num)
 	processors = create_processors(total_num)
 	solution = dag_solver.solution_pipe(graph, constraints, processors, rssi)
@@ -25,9 +24,7 @@ def create_rssi(total_num):
     def to_others(total,i):
         def rssi(i,j):
             if i==j:
-                return 1000
-            elif j==0:
-                return 900
+                return 100000
             else:
                 return 500
         return{j:rssi(i,j) for j in range(total)}
