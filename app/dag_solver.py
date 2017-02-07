@@ -103,6 +103,7 @@ def inconsistent_with_one(in_edge_assignment, all_out_edges):
     """given an assignment corresponding to the edge into a given
     node, find all assignments corresponding to the outward edge
     where inward_child!=outward_parent"""
+    print('inedge: ', in_edge_assignment, all_out_edges)
     return ((in_edge_assignment,i) for i in all_out_edges
             if i.parent!=in_edge_assignment.child)
 def edgepair_inconsistents(dummies, in_edge, out_edge):
@@ -127,15 +128,14 @@ def all_inconsistents(graph, dummies):
     return wrong_nodes
 
 def inout_consistency(graph, dummies, p, dummy_vars):
-    all_matchers = all_inconsistents(graph, dummies)
+    all_matchers = list(all_inconsistents(graph, dummies))
     print('all_matchers: ', all_matchers)
     for inconsistent_pair in all_matchers:
         description = json.dumps(inconsistent_pair)
         added_dummy_vars = [dummy_vars[i] for i in inconsistent_pair]
         p += (pulp.lpSum(added_dummy_vars)<=1,
         "pick one of mutex pair: "+description)
-    print('adding mutex:,', problem)
-    return problem
+    return p
 
 def create_list_from_gen(gen):
     return list(gen)
@@ -149,7 +149,6 @@ def formulate_LP(graph, constraints, processors, rssi):
     problem = add_cost_function(problem, d, dummy_vars, cost_calculator)
     problem = edge_uniqueness(problem, d, dummy_vars)
     problem = inout_consistency(graph, d_gen(), problem, dummy_vars)
-    print('problem: ', problem)
     return problem
 
 def solver(p):
@@ -178,11 +177,9 @@ def tuple_to_kv(tpl):
 def tuples_to_node_assignment_pairs(tuples):
     all_tuples = lazy_flattener(tuple_to_kv(tpl) for tpl in tuples)
     node_assignment_pairs = {k:v for k,v in all_tuples}
-    print('pairs: ', node_assignment_pairs)
     return sorted([(k,v) for k,v in node_assignment_pairs.items()], key=get_level)
 def output(solution):
     all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
-    print('all nonzero: ', all_nonzero)
     grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
     chosen = [max(i, key = get_val) for i in grouped]
     converted = [to_tuples(i[0]) for i in chosen]
