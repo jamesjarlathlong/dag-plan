@@ -43,9 +43,7 @@ def generate_dummies(graph, constraints):
     """generate a dummy variable named tuple for each
     valid combination of edge, assigned parent, assigned child"""
     edges = list(find_graph_edges(graph))
-    print('edges: ', edges)
     edge_possibilities = [combination_finder(edge,constraints) for edge in edges]
-    print('poss: ', edge_possibilities)
     combination_generator = (timed_product(*edge) for edge in edge_possibilities)
     all_dummies = unroll(combination_generator)
     return all_dummies
@@ -69,7 +67,7 @@ def find_cost(graph, processors, rssi, a_dummy):
     child_node_idx = int(child_node_name.split('_')[1])
     comm_size = parent_node['edge_w'].get(child_node_idx,0)
     comm_cost_next = comm_size/rssi[parent][child]
-    print('p,c: ', a_dummy, comp_cost+comm_cost_next)
+    #print('p,c: ', a_dummy, comp_cost+comm_cost_next)
     return comp_cost+comm_cost_next
 
 def edge_uniqueness(problem, dummies, dummy_vars):
@@ -97,7 +95,7 @@ def match_parentchild(edge, edges):
     return ((edge,i) for i in edges if i[0] == edge[1])
 def find_neighboring_edges(graph):
     """find all pairs of edges where child edge_i = parent edge_j"""
-    edges = find_graph_edges(graph)
+    edges = list(find_graph_edges(graph))
     return lazy_flattener((match_parentchild(edge, edges) for edge in edges))
 def inconsistent_with_one(in_edge_assignment, all_out_edges):
     """given an assignment corresponding to the edge into a given
@@ -114,7 +112,7 @@ def edgepair_inconsistents(dummies, in_edge, out_edge):
     to each possible assignment for the inward edge and then combined back
     into a single list
     """
-    matching_in_edge = (i for i in dummies if i.edge == in_edge)
+    matching_in_edge = [i for i in dummies if i.edge == in_edge]
     matching_out_edge = [i for i in dummies if i.edge == out_edge]
     return lazy_flattener((inconsistent_with_one(i, matching_out_edge)
                       for i in matching_in_edge))
@@ -122,14 +120,13 @@ def all_inconsistents(graph, dummies):
     """this function applies the find_inconsistent_assignments function
     over the whole graph: first by finding all pairs of in_edge, out_edge
     and then simply applying the function to each of these pairs in turn"""
-    edge_pairs = find_neighboring_edges(graph)
+    edge_pairs = list(find_neighboring_edges(graph))
     catcher = functools.partial(edgepair_inconsistents, dummies)
     wrong_nodes = lazy_flattener((catcher(*i) for i in edge_pairs))
     return wrong_nodes
 
 def inout_consistency(graph, dummies, p, dummy_vars):
     all_matchers = list(all_inconsistents(graph, dummies))
-    print('all_matchers: ', all_matchers)
     for inconsistent_pair in all_matchers:
         description = json.dumps(inconsistent_pair)
         added_dummy_vars = [dummy_vars[i] for i in inconsistent_pair]
@@ -148,7 +145,7 @@ def formulate_LP(graph, constraints, processors, rssi):
     cost_calculator = functools.partial(find_cost, graph, processors, rssi)
     problem = add_cost_function(problem, d, dummy_vars, cost_calculator)
     problem = edge_uniqueness(problem, d, dummy_vars)
-    problem = inout_consistency(graph, d_gen(), problem, dummy_vars)
+    problem = inout_consistency(graph, d, problem, dummy_vars)
     return problem
 
 def solver(p):
