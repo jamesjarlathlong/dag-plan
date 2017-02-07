@@ -101,7 +101,6 @@ def inconsistent_with_one(in_edge_assignment, all_out_edges):
     """given an assignment corresponding to the edge into a given
     node, find all assignments corresponding to the outward edge
     where inward_child!=outward_parent"""
-    print('inedge: ', in_edge_assignment, all_out_edges)
     return ((in_edge_assignment,i) for i in all_out_edges
             if i.parent!=in_edge_assignment.child)
 def edgepair_inconsistents(dummies, in_edge, out_edge):
