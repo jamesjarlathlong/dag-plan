@@ -48,27 +48,11 @@ def generate_graph_structure(code_class):
     graph = helper.pipe(*paramed_chain)(init_graph)
     return graph
 
-
 def define_the_class(code):
-    dummy_code = """class SenseReduce:
-    def __init__(self):
-        self.sensenodes = [[1],[2]]
-        self.mapnodes = [[0,1,2,3],[0,1,2,3]]
-        self.reducenodes = [[0,1,2]]
-    def sampler(self,node):
-        acc = yield from node.accel(20000) ###a lot of data
-        return acc
-    def mapper(self,node,d):
-        import time
-        avgs = {k: round(sum(v)/len(v),2) 
-                for k,v in d.items()} #just avg
-        yield(node.ID,avgs)#a much smaller amount of data
-    def reducer(self,node,k,vs):
-        yield(k,vs) #no reduction from map""" 
-    exec(dummy_code)
+    exec(code)
     return locals()['SenseReduce']()
 def get_weights(code_class):
-    code_instance = define_the_class(code_class)
+    code_instance = code_class
     weights = job_profiler(code_instance)
     return weights
 def add_weights_to_graph(weights_structure, graph):

@@ -1,15 +1,15 @@
-from app import app, db
-from models import Result
+from app import app
+#from models import Result
 from flask import (Flask, request, Response)
 import json
 import functools
 import app.dag_former as dag_former
 import app.dag_solver as dag_solver
-print('models: ', Result)
 @app.route('/solve', methods=['POST'])
 def solve():
-	code = request.json.code
+	code = request.form['code']
 	solution = solve_LP(code)
+	print('sol: ', solution)
 	return Response(json.dumps({'res':solution}), status = 200)
 def solve_LP(code):
 	graph = dag_former.generate_weighted_graph(code)
@@ -31,4 +31,3 @@ def create_rssi(total_num):
         return{j:rssi(i,j) for j in range(total)}
     other_gen = functools.partial(to_others,total_num)
     return{i:other_gen(i) for i in range(total_num)}
-sol = solve_LP('a')
