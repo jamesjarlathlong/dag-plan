@@ -7,6 +7,8 @@ import functools
 import time
 import random
 import app.helper as helper
+import app.dag_former as dag_former
+import app.bandwidth_calculator as bandwidth
 def find_communication_power(a, b, rssi):
     """a and b are the names of processor"""
     return rssi[a][b]
@@ -47,29 +49,88 @@ def generate_dummies(graph, constraints):
     combination_generator = (timed_product(*edge) for edge in edge_possibilities)
     all_dummies = unroll(combination_generator)
     return all_dummies
-def add_cost_function(problem, dummy,dummy_vars, cost_calculator):
+def get_stage(dummy):
+    """takes a dummy var namedtuple, e.g. Assignment(edge = ('S_0', 'M_0'), parent =0, child=1)
+    and returs the stage identifier of the child, in this instance M"""
+    return dummy.edge[1].split('_')[0]
+def group_by_stage(dummies):
+    sorted_dummies = sorted(dummies, key = get_stage)
+    return (g for k,g in itertools.groupby(sorted_dummies, get_stage))
+def is_bottleneck_pair(dummy_one, dummy_two):
+    same_child = dummy_one.child==dummy_two.child
+    different_edge = dummy_one.edge!=dummy_two.edge
+    return same_child and different_edge
+def find_stage_bottleneck_pairs(stage_dummies):
+    all_pairs = itertools.combinations(stage_dummies, 2)
+    return (pair for pair in all_pairs if is_bottleneck_pair(*pair))
+def find_all_bottleneck_pairs(dummies):
+    all_bottlenecks = (find_stage_bottleneck_pairs(stage_dummies) 
+                        for stage_dummies in group_by_stage(dummies))
+    return helper.lazy_flattener(all_bottlenecks)
+def logical_and(dependent, driver1, driver2):
+    return [dependent>=driver1+driver2-1,
+            dependent<=driver1,
+            dependent<=driver2]
+def add_constraints(problem, constraints):
+    for c in constraints:
+        problem += c
+    return problem
+def add_bottleneck_constraint(bottleneck_vars, dummy_vars, problem, bottleneck_dummy):
+    dependent = bottleneck_vars[bottleneck_dummy]
+    driver1 = dummy_vars[bottleneck_dummy.one]
+    driver2 = dummy_vars[bottleneck_dummy.two]
+    constraints = logical_and(dependent, driver1, driver2)
+    problem = add_constraints(problem, constraints)
+    return problem
+def constrain_bottlenecks(bottleneck_vars, dummy_vars, problem, bottleneck_dummies):
+    constrainer = functools.partial(add_bottleneck_constraint, bottleneck_vars, dummy_vars)
+    for dummy in bottleneck_dummies:
+        problem = constrainer(problem, dummy)
+    return problem
+def create_bottleneck_dummy(dummy_one, dummy_two):
+    template = collections.namedtuple('Bottleneck', 'one two')
+    return template(one=dummy_one, two=dummy_two)
+def create_bottleneck_dummies(pairs):
+    return (create_bottleneck_dummy(*pair) for pair in pairs)
+def calculate_bottleneck_cost(graph, rssi, bottleneck_dummy):
+    comm_cost_finder = functools.partial(find_comm_cost, graph,rssi)
+    return min(comm_cost_finder(bottleneck_dummy.one),comm_cost_finder(bottleneck_dummy.two))
+def add_bottleneck_dummies(problem, bottleneck_dummies, bottleneck_vars, cost_fun):
+    cost_function = (cost_fun(i)* bottleneck_vars[i] for i in bottleneck_dummies)
+    return cost_function
+def add_cost_function(problem, dummy, dummy_vars, cost_calculator):
     cost_function = (cost_calculator(i)*dummy_vars[i] for i in dummy)
-    problem += pulp.lpSum(cost_function), "Sum of DAG edge weights"
+    return cost_function
+def combine_costs(cost1, cost2):
+    return itertools.chain(cost1, cost2)
+def cost_adder(problem, costs):
+    problem+=pulp.lpSum(costs)
     return problem
 def find_communication_power(a, b, rssi):
     """a and b are the names of processor"""
     return rssi[a][b]
 def find_computation_power(a, processors):
     return processors[a]
-def find_cost(graph, processors, rssi, a_dummy):
-    """node is a key value pair, assignments is a named tuple"""
-    parent_node = graph[a_dummy.edge[0]]
-    child_node = graph[a_dummy.edge[1]]
+def find_comm_cost(graph, rssi, a_dummy):
     parent = a_dummy.parent
     child = a_dummy.child
-    comp_cost = parent_node['node_w']/processors[parent]
+    parent_node = graph[a_dummy.edge[0]]
+    child_node = graph[a_dummy.edge[1]]
     child_node_name = a_dummy.edge[1]
     child_node_idx = int(child_node_name.split('_')[1])
     comm_size = parent_node['edge_w'].get(child_node_idx,0)
-    comm_cost_next = comm_size/rssi[parent][child]
-    #print('p,c: ', a_dummy, comp_cost+comm_cost_next)
-    return comp_cost+comm_cost_next
-
+    comm_cost_next = comm_size*rssi[parent][child] #'rssi' gives time per byte
+    return comm_cost_next
+def find_comp_cost(graph, processors, a_dummy):
+    parent_node = graph[a_dummy.edge[0]]
+    parent = a_dummy.parent
+    parent_type = get_stage(a_dummy)
+    speed = 1 if parent_type == 'M' else processors[parent]
+    comp_cost = parent_node['node_w']/speed
+    return comp_cost
+def find_cost(graph, processors, rssi, a_dummy):
+    """node is a key value pair, assignments is a named tuple"""
+    return find_comp_cost(graph, processors, a_dummy)+find_comm_cost(graph, rssi, a_dummy)
 def edge_uniqueness(problem, dummies, dummy_vars):
     """given all possible dummy variable assignments
     and the ILP problem, create the constraints that 
@@ -87,7 +148,7 @@ def constrain_one_edge(problem, grouped_by_edge, dummy_vars):
     """
     edge_vars = (dummy_vars[i] for i in grouped_by_edge)
     problem += (pulp.lpSum(edge_vars)==1,
-                "sum of dummies eq 1 for: "+str(random.random()))
+                "sum of dummies equals 1 for: "+str(random.random()))
     return problem
 ###=======make sure edge assignments match at nodes======###
 def match_parentchild(edge, edges):
@@ -132,22 +193,26 @@ def inout_consistency(graph, dummies, p, dummy_vars):
         p += (pulp.lpSum(added_dummy_vars)<=1,
         "pick one of mutex pair: "+description)
     return p
-
-def create_list_from_gen(gen):
-    return list(gen)
-
 def formulate_LP(graph, constraints, processors, rssi):
     d_gen = functools.partial(generate_dummies, graph, constraints)
-    d = create_list_from_gen(d_gen())
+    d = list(d_gen())
     problem = pulp.LpProblem("DAG",pulp.LpMinimize)
     dummy_vars = pulp.LpVariable.dicts("Sensor", d,0, 1, 'Binary')
     cost_calculator = functools.partial(find_cost, graph, processors, rssi)
-    problem = add_cost_function(problem, d, dummy_vars, cost_calculator)
+    edge_costs = add_cost_function(problem, d, dummy_vars, cost_calculator)
+    ###
+    bottleneck_pairs = find_all_bottleneck_pairs(d)
+    bottleneck_dummies = list(create_bottleneck_dummies(bottleneck_pairs))
+    bottleneck_vars = pulp.LpVariable.dicts("Bottlenecks", bottleneck_dummies, 0, 1, 'Binary')
+    bottleneck_cost_calculator = functools.partial(calculate_bottleneck_cost, graph, rssi)
+    bottleneck_costs = add_bottleneck_dummies(problem, bottleneck_dummies, bottleneck_vars, bottleneck_cost_calculator)
+    problem = cost_adder(problem, combine_costs(edge_costs, bottleneck_costs))
+    problem = constrain_bottlenecks(bottleneck_vars, dummy_vars, problem, bottleneck_dummies)
     problem = edge_uniqueness(problem, d, dummy_vars)
     problem = inout_consistency(graph, d, problem, dummy_vars)
     return problem
-
 def solver(p):
+    print('trying to solve')
     res = p.solve()
     return p
 def to_tuples(str):
@@ -174,15 +239,24 @@ def tuples_to_node_assignment_pairs(tuples):
     all_tuples = lazy_flattener(tuple_to_kv(tpl) for tpl in tuples)
     node_assignment_pairs = {k:v for k,v in all_tuples}
     return sorted([(k,v) for k,v in node_assignment_pairs.items()], key=get_level)
+def is_assignment(str):
+    return str.split('(')[0]=="Sensor_Assignment"
 def output(solution):
     all_nonzero = [(v.name,v.varValue) for v in solution.variables() if v.varValue >0]
     grouped = [list(g) for k,g in itertools.groupby(all_nonzero, keyfunct)]
     chosen = [max(i, key = get_val) for i in grouped]
-    converted = [to_tuples(i[0]) for i in chosen]
+    converted = [to_tuples(i[0]) for i in chosen if is_assignment(i[0])]
     node_assignment_pairs = tuples_to_node_assignment_pairs(converted)
     grouped_by_level = {k:list(g) for k,g in itertools.groupby(node_assignment_pairs, get_level)}
     chosen = {k: [i[1] for i in sortbynode(g)] for k,g in grouped_by_level.items()}
-    return chosen
+    return chosen, pulp.value(solution.objective)
 
 solution_pipe = helper.pipe(formulate_LP, solver, output)
+
+def solve_DAG(code, rssi, processors):
+    graph = dag_former.generate_weighted_graph(code)
+    constraints = dag_former.generate_constraints(code, graph)
+    bw = bandwidth.get_full_bw(rssi)
+    solution,time = solution_pipe(graph, constraints, processors, bw)
+    return solution,time
 

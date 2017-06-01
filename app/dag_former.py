@@ -1,6 +1,7 @@
 import functools
 import app.helper as helper
 from app.node_emulator import job_profiler
+
 def var_namer(num, prefix):
     return prefix+'_'+str(num)
 def add_sensers(sensers, mappers, reducers,graph):
@@ -54,6 +55,7 @@ def define_the_class(code):
 def get_weights(code_class):
     code_instance = code_class
     weights = job_profiler(code_instance)
+    print('weights: ', weights)
     return weights
 def add_weights_to_graph(weights_structure, graph):
     weights_structure['K'] = {0:{'cost':0, 'edge':{}}}
@@ -70,3 +72,4 @@ def generate_weighted_graph(code):
     weight_adder = functools.partial(add_weights_to_graph, get_weights(code_class))
     full_graph_pipe = helper.pipe(generate_graph_structure, weight_adder)
     return full_graph_pipe(code_class)
+

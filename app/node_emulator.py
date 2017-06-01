@@ -38,7 +38,7 @@ def execute_sampler(sampler, node):
 def run_sense(job_instance, node_idx, structure):
     node = Node(node_idx)
     time, data = timeit(execute_sampler)(job_instance.sampler, node)
-    structure['S'][node_idx]['cost'] = time
+    structure['S'][node_idx]['cost'] = len(data['x'])+random.uniform(0,250)
     structure['S'][node_idx]['edge'][node_idx] = data
     return structure
 def execute_mapper(mapper, node, data):

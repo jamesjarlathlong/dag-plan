@@ -2,10 +2,10 @@ import requests
 code = """class SenseReduce:
     def __init__(self):
         self.sensenodes = [[1],[2]]
-        self.mapnodes = [[0,1,2,3],[0,1,2,3]]
-        self.reducenodes = [[0,1,2]]
+        self.mapnodes = [[1,2],[4]]
+        self.reducenodes = [[3]]
     def sampler(self,node):
-        acc = yield from node.accel(20000) ###a lot of data
+        acc = yield from node.accel(2000) ###a lot of data
         return acc
     def mapper(self,node,d):
         import time

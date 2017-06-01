@@ -5,6 +5,7 @@ import json
 import functools
 import app.dag_former as dag_former
 import app.dag_solver as dag_solver
+import app.bandwidth_calculator as bandwidth
 @app.route('/solve', methods=['POST'])
 def solve():
 	code = request.form['code']
@@ -12,22 +13,18 @@ def solve():
 	print('sol: ', solution)
 	return Response(json.dumps({'res':solution}), status = 200)
 def solve_LP(code):
-	graph = dag_former.generate_weighted_graph(code)
-	constraints = dag_former.generate_constraints(code, graph)
 	total_num = 10
 	rssi = create_rssi(total_num)
 	processors = create_processors(total_num)
-	solution = dag_solver.solution_pipe(graph, constraints, processors, rssi)
+	solution = dag_solver.solve_DAG(code, rssi, processors)
 	return solution
 def create_processors(total_num):
-    return {0:30000, 1:10, 2:10,3:10,4:10,5:10}
+    return {0:1, 1:0.01, 2:0.01,3:0.01,4:0.01,5:0.01}
 def create_rssi(total_num):
     def to_others(total,i):
         def rssi(i,j):
-            if i==j:
-                return 100000
-            else:
-                return 500
+        	if i!=j:
+        		return -50
         return{j:rssi(i,j) for j in range(total)}
     other_gen = functools.partial(to_others,total_num)
     return{i:other_gen(i) for i in range(total_num)}
