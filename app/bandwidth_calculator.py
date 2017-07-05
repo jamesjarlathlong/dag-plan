@@ -6,8 +6,8 @@ import app.pathfinder as pathfinder
 def probability_success(failure_when_perfect, rssi):
     """failure_when_perfect is the probability of a failed packet
     when the rssi is of very high quality
-    rssi is in -db, usually in the range -30 to -50"""
-    sigmoid = (1-failure_when_perfect)/(1+math.exp(-0.2*(75+rssi)))
+    rssi is in -db, usually in the range -40 to -100"""
+    sigmoid = (1-failure_when_perfect)/(1+math.exp(-0.2*(70+rssi)))
     return sigmoid
 our_ps = functools.partial(probability_success, 0.01)
 

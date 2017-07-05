@@ -31,7 +31,7 @@ def plotgraph(graph):
         for j in G[i]:
             ax.plot(pos_array[0, [i, j]], pos_array[1, [i, j]], color='#525252',linewidth=1)
     # Plot nodes
-    ax.scatter(pos_array[0], pos_array[1], sizes, color = cm(node_color/node_color.max()), zorder = 10)
+    ax.scatter(pos_array[0], pos_array[1], sizes, facecolor = 'w',edgecolor='#525252', zorder = 10)
     for i in G:
         ax.annotate('   '+str(i), xy=(pos_array[0,i], pos_array[1,i]), color ='#252525',zorder=11)
     # Remove axis ticks
