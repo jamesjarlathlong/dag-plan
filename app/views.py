@@ -6,20 +6,36 @@ import functools
 import app.dag_former as dag_former
 import app.dag_solver as dag_solver
 import app.bandwidth_calculator as bandwidth
+import app.node_emulator as node_emulator
 @app.route('/solve', methods=['POST'])
 def solve():
 	code = request.form['code']
 	solution = solve_LP(code)
 	print('sol: ', solution)
 	return Response(json.dumps({'res':solution}), status = 200)
-def solve_LP(code):
+def solve_LP(code, rssi=None, proc=None):
+	graph = dag_former.generate_weighted_graph(code)
+	constraints = dag_former.generate_constraints(code, graph)
 	total_num = 10
-	rssi = create_rssi(total_num)
-	processors = create_processors(total_num)
-	solution = dag_solver.solve_DAG(code, rssi, processors)
+	if not rssi:
+		rssi = create_rssi(total_num)
+	if not proc:
+		proc = create_processors(total_num)
+	solution = dag_solver.solution_pipe(graph, constraints, proc, rssi)
 	return solution
+
+def scale_proc(d):
+	"""takes a list of dictionaries of the form [{node:91, size:10, t:0.03}]"""
+	sizes = set([i['size'] for i in d])
+	ref = {k:node_emulator.benchmark1(k)[0] for k in sizes}
+	def scale_d_item(d_item, ref):
+		ref_time = ref[d_item['size']]
+		return ref_time/d_item['t']
+	proc = {k['node']: scale_d_item(k, ref) for k in d}
+	return proc
+
 def create_processors(total_num):
-    return {0:1, 1:0.01, 2:0.01,3:0.01,4:0.01,5:0.01}
+    return {k:1 if k==0 else 0.05 for k in range(len(total_num))}
 def create_rssi(total_num):
     def to_others(total,i):
         def rssi(i,j):

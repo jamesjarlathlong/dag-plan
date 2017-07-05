@@ -6,14 +6,25 @@ import itertools
 from copy import deepcopy
 import json
 from collections import defaultdict
+import app.np as np
+import random as urandom
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()
         result = method(*args, **kw)
         te = time.time()
-        execution_time = 1000*(te-ts)
-        return execution_time, result
+        ex_time = te-ts
+        return ex_time,result
     return timed
+@timeit
+def benchmark1(size):
+    def vec(size):
+        return [urandom.getrandbits(8)/100 for i in range(size)]    
+    mat = (vec(size) for i in range(size))
+    vec = np.Vector(*vec(size))
+    res = vec.gen_matrix_mult(mat)
+    del res
+    return 
 class Node:
     def __init__(self,num):
         self.ID = num
