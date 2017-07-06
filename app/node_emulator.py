@@ -21,9 +21,8 @@ def benchmark1(size):
     def vec(size):
         return [urandom.getrandbits(8)/100 for i in range(size)]    
     mat = (vec(size) for i in range(size))
-    vec = np.Vector(*vec(size))
-    res = vec.gen_matrix_mult(mat)
-    del res
+    v = np.Vector(*vec(size))
+    res = v.gen_matrix_mult(mat)
     return 
 class Node:
     def __init__(self,num):
