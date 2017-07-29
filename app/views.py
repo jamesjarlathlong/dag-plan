@@ -9,6 +9,7 @@ import app.bandwidth_calculator as bandwidth
 import app.node_emulator as node_emulator
 @app.route('/solve', methods=['POST'])
 def solve():
+	print('got a req',request,request.form)
 	code = request.form['code']
 	solution = solve_LP(code)
 	print('sol: ', solution)
@@ -21,6 +22,7 @@ def solve_LP(code, rssi=None, proc=None):
 		rssi = create_rssi(total_num)
 	if not proc:
 		proc = create_processors(total_num)
+	print(rssi)
 	solution = dag_solver.solution_pipe(graph, constraints, proc, rssi)
 	return solution
 
@@ -35,7 +37,7 @@ def scale_proc(d):
 	return proc
 
 def create_processors(total_num):
-    return {k:1 if k==0 else 0.05 for k in range(len(total_num))}
+    return {k:1 if k==0 else 0.05 for k in range(total_num)}
 def create_rssi(total_num):
     def to_others(total,i):
         def rssi(i,j):
