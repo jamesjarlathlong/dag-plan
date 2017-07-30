@@ -8,6 +8,7 @@ import json
 from collections import defaultdict
 import app.np as np
 import random as urandom
+import asyncio
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()
@@ -16,6 +17,16 @@ def timeit(method):
         ex_time = te-ts
         return ex_time,result
     return timed
+def time_s(method):
+    def timed(*args, **kw):
+        l = asyncio.get_event_loop()
+        ts = time.time()
+        res = l.run_until_complete(method(*args,**kw))
+        te = time.time()
+        ex_time = te-ts
+        return ex_time,res
+    return timed
+
 @timeit
 def benchmark1(size):
     def vec(size):
@@ -42,13 +53,26 @@ class Node:
             result['z'].extend(packet[2::3])
             ##print('result: ', len(result['x']))
         trimmed = {k:v[0:sample_length] for k,v in result.items()}
-        yield trimmed
+        yield from asyncio.sleep(0)
+        return trimmed
+    def testaccel(self, sample_length):
+        fname = '192.168.123.99.json'
+        print('opening: ',fname)
+        gc.collect()
+        print(gc.mem_free())
+        with open(fname) as json_data:
+            d = json.loads(json_data.read())
+            yield from asyncio.sleep(0)
+            trimmed = {k:v[0:sample_length] for k,v in d.items()}  
+            return trimmed 
 def execute_sampler(sampler, node):
-    return [d for d in sampler(node)][0]
+    return sampler(node)
 def run_sense(job_instance, node_idx, structure):
     node = Node(node_idx)
-    time, data = timeit(execute_sampler)(job_instance.sampler, node)
-    structure['S'][node_idx]['cost'] = len(data['x'])+random.uniform(0,250)
+    time, data = time_s(execute_sampler)(job_instance.sampler, node)
+    len_data = job_instance.l
+    sampling_time = (len_data+random.uniform(0,250))/2000 #Hz
+    structure['S'][node_idx]['cost'] = 1000*sampling_time #milliseconds
     structure['S'][node_idx]['edge'][node_idx] = data
     return structure
 def execute_mapper(mapper, node, data):
@@ -65,7 +89,7 @@ def run_map(job_instance, node_idx, structure):
     sorted_kvs = sorted(kvs, key = lambda x:x[0])
     hasher = functools.partial(partition, job_instance.reducenodes)
     grouped_by_hash = {k:group_kvs_bykey(g) for k,g in itertools.groupby(sorted_kvs, hasher)}
-    structure['M'][node_idx]['cost'] = time
+    structure['M'][node_idx]['cost'] = 1000*time #milliseconds
     for target, data in grouped_by_hash.items():
         structure['M'][node_idx]['edge'][target] = data
     return structure
@@ -91,7 +115,7 @@ def run_reduce(job_instance, node_idx, structure):
     in_data = get_in_data(structure, node_idx)
     reduce_func = functools.partial(job_instance.reducer, node_idx)
     time, out_data = timeit(execute_reducer)(reduce_func, in_data)
-    structure['R'][node_idx]['cost']=time
+    structure['R'][node_idx]['cost']= 1000*time #milliseconds
     structure['R'][node_idx]['edge'][0] = out_data
     return structure
 def add_sense(job_instance, structure):
@@ -118,7 +142,7 @@ def convert_to_lengths(final_struct):
     for k,v in final_struct.items():
         for node, values in v.items():
             for target_node, msg in values['edge'].items():
-                msg_length = len(json.dumps(msg)) if msg else 0
+                msg_length = len(json.dumps(msg,separators=(',',':'))) if msg else 0
                 values['edge'][target_node] = msg_length
     return final_struct
 def job_profiler(job_instance):
