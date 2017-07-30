@@ -162,7 +162,7 @@ def radix2(x):
     return [even[k] + T[k] for k in range(N//2)] + \
            [even[k] - T[k] for k in range(N//2)]
 def zero_mean(x):
-    a = np.Vector(*x)
+    a = Vector(*x)
     return a._zero_mean()
 def fft(x):
     return radix2(zero_mean(x))
