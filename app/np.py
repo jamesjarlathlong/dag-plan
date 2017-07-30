@@ -1,4 +1,6 @@
 import math
+import gc
+import cmath
 class Vector(object):
     def __init__(self, *args):
         """ Create a vector, example: v = Vector(1,2) """
@@ -67,8 +69,13 @@ class Vector(object):
         """
         # Grab a row from the matrix, make it a Vector, take the dot product, 
         # and store it as the first component
-        product = tuple(Vector(*row)*self for row in matrix)
-        
+        product = len(self)*[0.00]
+        for idx,row in enumerate(matrix):
+            product[idx] = Vector(*row)*self
+            try:
+                gc.mem_free()
+            except:
+                pass
         return Vector(*product)
     def matrix_mult(self, matrix):
         """ Multiply this vector by a matrix.  Assuming matrix is a list of lists.
@@ -78,13 +85,12 @@ class Vector(object):
             Vector(1,2,3).matrix_mult(mat) ->  (14, 2, 26)
          
         """
-        if not all(len(row) == len(self) for row in matrix):
-            raise ValueError('Matrix must match vector dimensions') 
-        
+        """if not all(len(row) == len(self) for row in matrix):
+           raise ValueError('Matrix must match vector dimensions') 
+        """
         # Grab a row from the matrix, make it a Vector, take the dot product, 
         # and store it as the first component
         product = tuple(Vector(*row)*self for row in matrix)
-        
         return Vector(*product)
     
     def inner(self, other):
@@ -146,6 +152,21 @@ def get_column(nested_lst, idx):
 
 def get_column_as_vec(nested_lst, idx):
     return Vector(*get_column(nested_lst, idx))
+
+def radix2(x):
+    N = len(x)
+    if N <= 1: return x
+    even = fft(x[0::2])
+    odd =  fft(x[1::2])
+    T= [cmath.exp(-2j*cmath.pi*k/N)*odd[k] for k in range(N//2)]
+    return [even[k] + T[k] for k in range(N//2)] + \
+           [even[k] - T[k] for k in range(N//2)]
+def zero_mean(x):
+    a = np.Vector(*x)
+    return a._zero_mean()
+def fft(x):
+    return radix2(zero_mean(x))
+
 
 
 
