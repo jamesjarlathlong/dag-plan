@@ -9,6 +9,7 @@ import app.bandwidth_calculator as bandwidth
 import app.node_emulator as node_emulator
 @app.route('/solve', methods=['POST'])
 def solve():
+	print('got a req',request,request.form)
 	code = request.form['code']
 	solution = solve_LP(code)
 	print('sol: ', solution)
@@ -34,8 +35,10 @@ def scale_proc(d):
 	proc = {k['node']: scale_d_item(k, ref) for k in d}
 	return proc
 
+
 def create_processors(rssi):
     return processor = {k:1 if k==0 else 0.05 for k in range(len(rssi))}
+
 def create_rssi(total_num):
     rssi = create_network(range(3), range(3,12),1)
     return mirror(rssi)
