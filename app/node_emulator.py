@@ -35,9 +35,13 @@ def benchmark1(size):
     v = np.Vector(*vec(size))
     res = v.gen_matrix_mult(mat)
     return 
+benchmark1(10)
+
 class Node:
     def __init__(self,num):
         self.ID = num
+        self.np = np
+        print('called emulator!!',np)
     def accelpacketyielder(self):
         return [random.uniform(-2,2) for i in range(120)]
     def accel(self, sample_length):
@@ -56,10 +60,8 @@ class Node:
         yield from asyncio.sleep(0)
         return trimmed
     def testaccel(self, sample_length):
-        fname = '192.168.123.99.json'
+        fname = 'app/192.168.123.99.json'
         print('opening: ',fname)
-        gc.collect()
-        print(gc.mem_free())
         with open(fname) as json_data:
             d = json.loads(json_data.read())
             yield from asyncio.sleep(0)
