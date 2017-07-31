@@ -165,7 +165,7 @@ def zero_mean(x):
     a = Vector(*x)
     return a._zero_mean()
 def fft(x):
-    return radix2(zero_mean(x))
+    return radix2(list(zero_mean(x)))
 
 
 
