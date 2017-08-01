@@ -6,9 +6,13 @@ import itertools
 from copy import deepcopy
 import json
 from collections import defaultdict
-import app.np as np
+from app import np
 import random as urandom
 import asyncio
+def argmax(complex_list):
+    abs_list = map(abs, complex_list)
+    idx = abs_list.index(max(abs_list))
+    return idx,complex_list[idx]
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()

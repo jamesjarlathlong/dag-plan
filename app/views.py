@@ -23,6 +23,9 @@ def solve():
     code = request.form['code']
     rssi = load_rssi(request.form['rssi'])
     px = load_px(request.form['px'])
+    def correct(v):
+        return 1 if v==1 else v
+    px = {k:correct(v) for k,v in px.items()}
     print('p,r',px,rssi)
     solution = solve_LP(code,rssi=rssi,proc=px)
     print('sol: ', solution)
