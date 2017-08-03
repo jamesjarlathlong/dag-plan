@@ -7,48 +7,64 @@ import app.dag_former as dag_former
 import app.dag_solver as dag_solver
 import app.bandwidth_calculator as bandwidth
 import app.node_emulator as node_emulator
+import math
+import itertools
+import collections
+def inted(dct):
+    return {int(k):v for k,v in dct.items()}
+def load_rssi(jsonified):
+    j = json.loads(jsonified)
+    return inted({k:inted(v) for k,v in j.items()})
+def load_px(jsonified):
+    j = json.loads(jsonified)
+    return inted(j)
 @app.route('/solve', methods=['POST'])
 def solve():
-	print('got a req',request,request.form)
-	code = request.form['code']
-	solution = solve_LP(code)
-	print('sol: ', solution)
-	return Response(json.dumps({'res':solution}), status = 200)
+    code = request.form['code']
+    rssi = load_rssi(request.form['rssi'])
+    px = load_px(request.form['px'])
+    def correct(v):
+        return 1 if v==1 else v
+    px = {k:correct(v) for k,v in px.items()}
+    print('p,r',px,rssi)
+    solution = solve_LP(code,rssi=rssi,proc=px)
+    print('sol: ', solution)
+    return Response(json.dumps(solution), status = 200)
 def solve_LP(code, rssi=None, proc=None):
-	graph = dag_former.generate_weighted_graph(code)
-	constraints = dag_former.generate_constraints(code, graph)
-	total_num = 10
-	if not rssi:
-		rssi = create_rssi(total_num)
-	if not proc:
-		proc = create_processors(rssi)
-	solution = dag_solver.solution_pipe(graph, constraints, proc, rssi)
-	return solution
+    graph = dag_former.generate_weighted_graph(code)
+    total_num = 10
+    if not rssi:
+        rssi = create_rssi(total_num)
+    if not proc:
+        proc = create_processors(rssi)
+    solution= dag_solver.solve_DAG(code,rssi,proc)
+    return solution
 
 def scale_proc(d):
-	"""takes a list of dictionaries of the form [{node:91, size:10, t:0.03}]"""
-	sizes = set([i['size'] for i in d])
-	ref = {k:node_emulator.benchmark1(k)[0] for k in sizes}
-	def scale_d_item(d_item, ref):
-		ref_time = ref[d_item['size']]
-		return ref_time/d_item['t']
-	proc = {k['node']: scale_d_item(k, ref) for k in d}
-	return proc
+    """takes a list of dictionaries of the form [{node:91, size:10, t:0.03}]"""
+    sizes = set([i['size'] for i in d])
+    ref = {k:node_emulator.benchmark1(k)[0] for k in sizes}
+    def scale_d_item(d_item, ref):
+        ref_time = ref[d_item['size']]
+        return ref_time/d_item['t']
+    proc = {k['node']: scale_d_item(k, ref) for k in d}
+    return proc
 
 
 def create_processors(rssi):
-    return {k:1 if k==0 else 0.05 for k in range(len(rssi))}
-
+    return {k:1 if k==0 else 0.05 for k in ks}
 def create_rssi(total_num):
-    rssi = create_network(range(3), range(3,12),1)
-    return mirror(rssi)
+    #rssi = create_network(range(3), range(3,12),1)
+    #return mirror(rssi)
+    rssi = {95:{31:-50,0:-50,},31:{95:-50,0:-20},0:{95:-45}}
+    return rssi
 def chunk(lst, num_chunks):
     chunk_size = math.ceil(len(lst)/num_chunks)
     chunks = (list(itertools.islice(lst, x, x+chunk_size))
               for x in range(0, len(lst), chunk_size))
     return list(chunks)
 def lst_to_dict(lst):
-    return {k:-50 for k in lst}
+    return {k:-20 for k in lst}
 def merge_two_dicts(x, y):
     z = x.copy()
     z.update(y)

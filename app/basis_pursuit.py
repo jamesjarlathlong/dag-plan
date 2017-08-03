@@ -4,10 +4,14 @@ min ||x||_1 st Ax=b where b is the the signal
 A is a basis matrix and x is the solution vector
 """
 import math
-from algorithms import np
-from algorithms import coord_descent as cd
-from algorithms import fourier_basis as ft
-
+try:
+	from algorithms import np
+	from algorithms import coord_descent as cd
+	from algorithms import fourier_basis as ft
+except ImportError:
+	from app import np
+	from app import coord_descent as cd
+	from app import fourier_basis as ft
 def sk_bp(A, signal, alpha):
     clf = cd.Lasso(alpha=alpha, max_iter=100)
     fitted = clf.fit(A, signal)

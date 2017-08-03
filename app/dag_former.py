@@ -1,8 +1,15 @@
 import functools
 import app.helper as helper
 from app.node_emulator import job_profiler
+import time
 from app import np
 from app import basis_pursuit as bp
+from app import fourier_basis as ft
+def argmax(complex_list):
+    abs_list = list(map(abs, complex_list))
+    idx = abs_list.index(max(abs_list))
+    return idx,complex_list[idx]
+
 def var_namer(num, prefix):
     return prefix+'_'+str(num)
 def add_sensers(sensers, mappers, reducers,graph):
