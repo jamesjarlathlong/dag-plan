@@ -75,13 +75,16 @@ def just_weights(tree):
 def connect_full(graph):
     return {k: just_weights(run_dijkstra(k, graph)) for k in graph}
 """
-def connect_full(graph):
-    def explicitize(num):
-        return {'weight':num}
-    def meta_explicit(dct):
-        return {k:explicitize(num) for k,num in dct.items()}
-    weight_explicit = {k:meta_explicit(v) for k,v in graph.items()}
+def explicitize(num):
+    return {'weight':num}
+def meta_explicit(dct):
+    return {k:explicitize(num) for k,num in dct.items()}
+def network_graph(dct):
+    weight_explicit = {k:meta_explicit(v) for k,v in dct.items()}
     G = nx.DiGraph(weight_explicit)
+    return G
+def connect_full(graph):
+    G = network_graph(graph)
     path=nx.all_pairs_dijkstra_path_length(G)
     return path 
 
