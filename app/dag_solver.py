@@ -7,6 +7,7 @@ import functools
 import time
 import random
 import app.helper as helper
+import app.np as np
 import app.dag_former as dag_former
 import app.bandwidth_calculator as bandwidth
 def find_communication_power(a, b, rssi):
@@ -119,7 +120,8 @@ def find_comm_cost(graph, rssi, a_dummy):
     child_node_name = a_dummy.edge[1]
     child_node_idx = int(child_node_name.split('_')[1])
     comm_size = parent_node['edge_w'].get(child_node_idx,0)
-    comm_cost_next = comm_size*rssi[parent][child] #'rssi' gives time per byte
+    reverse = rssi[child].get(parent,1e9)
+    comm_cost_next = comm_size*rssi[parent].get(child,reverse) #'rssi' gives time per byte - if no route and no reverse just make very large
     return comm_cost_next
 def find_comp_cost(graph, processors, a_dummy):
     parent_node = graph[a_dummy.edge[0]]
@@ -252,11 +254,13 @@ def output(solution):
     return chosen, pulp.value(solution.objective)
 
 solution_pipe = helper.pipe(formulate_LP, solver, output)
-
+def tr(rssi):
+    sub_dict = lambda d: {k:round(v,2) for k,v in d.items()}
+    return {k:sub_dict(v) for k,v in rssi.items()}
 def solve_DAG(code, rssi, processors):
     graph = dag_former.generate_weighted_graph(code)
     constraints = dag_former.generate_constraints(code, graph)
     bw = bandwidth.get_full_bw(rssi)
     solution,time = solution_pipe(graph, constraints, processors, bw)
-    return solution,time
+    return {'sol':solution,'graph':graph,'bw':tr(bw),'px':processors,'totaltime':time}#add graph and bw for reconstruction
 

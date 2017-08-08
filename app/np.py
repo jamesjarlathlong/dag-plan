@@ -1,4 +1,9 @@
 import math
+import gc
+import cmath
+import random as urandom
+def conj(a):
+    return a.real-1j*a.imag
 class Vector(object):
     def __init__(self, *args):
         """ Create a vector, example: v = Vector(1,2) """
@@ -7,6 +12,8 @@ class Vector(object):
     def norm(self):
         """ Returns the norm (length, magnitude) of the vector """
         return math.sqrt(sum( comp**2 for comp in self ))
+    def cnorm(self):
+        return math.sqrt(sum((comp*conj(comp)).real for comp in self))
     def _zero_mean(self):
         mean = self.mean()
         zeroed = tuple(i-mean for i in self)
@@ -67,8 +74,13 @@ class Vector(object):
         """
         # Grab a row from the matrix, make it a Vector, take the dot product, 
         # and store it as the first component
-        product = tuple(Vector(*row)*self for row in matrix)
-        
+        product = len(self)*[0.00]
+        for idx,row in enumerate(matrix):
+            product[idx] = Vector(*row)*self
+            try:
+                gc.collect()
+            except:
+                pass
         return Vector(*product)
     def matrix_mult(self, matrix):
         """ Multiply this vector by a matrix.  Assuming matrix is a list of lists.
@@ -78,13 +90,12 @@ class Vector(object):
             Vector(1,2,3).matrix_mult(mat) ->  (14, 2, 26)
          
         """
-        if not all(len(row) == len(self) for row in matrix):
-            raise ValueError('Matrix must match vector dimensions') 
-        
+        """if not all(len(row) == len(self) for row in matrix):
+           raise ValueError('Matrix must match vector dimensions') 
+        """
         # Grab a row from the matrix, make it a Vector, take the dot product, 
         # and store it as the first component
         product = tuple(Vector(*row)*self for row in matrix)
-        
         return Vector(*product)
     
     def inner(self, other):
@@ -146,6 +157,38 @@ def get_column(nested_lst, idx):
 
 def get_column_as_vec(nested_lst, idx):
     return Vector(*get_column(nested_lst, idx))
+
+def radix2(x):
+    N = len(x)
+    if N <= 1: return x
+    even = radix2(x[0::2])
+    odd =  radix2(x[1::2])
+    T= [cmath.exp(-2j*cmath.pi*k/N)*odd[k] for k in range(N//2)]
+    return [even[k] + T[k] for k in range(N//2)] + \
+           [even[k] - T[k] for k in range(N//2)]
+def zero_mean(x):
+    a = Vector(*x)
+    return a._zero_mean()
+def fft(x):
+    return radix2(list(zero_mean(x)))
+def rand_unif():
+    return 1-2*urandom.getrandbits(8)/255
+def spectral_mat(ws):
+    one_row = lambda i,lst: [i*conj(e) for e in lst]
+    all_rows = lambda lst:[one_row(i,lst) for i in lst]
+    return all_rows(ws)
+def pagerank(lst_of_lists, max_iter = 100):
+    n = len(lst_of_lists)
+    initial = Vector(*[rand_unif()+1j*rand_unif() for i in range(n)])
+    for n in range(max_iter):
+        new_initial = Vector(*initial)
+        xi=new_initial.matrix_mult(lst_of_lists)
+        l_norm = xi.cnorm()
+        xi = [i/l_norm for i in xi]
+        if (new_initial-xi).cnorm()<1e-10:
+            break
+    return xi
+
 
 
 
