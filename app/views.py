@@ -52,8 +52,6 @@ def scale_proc(d):
 
 
 def create_processors(rssi):
-    ks = [95,0,31]
-    #return {k:1 if k==0 else 0.05 for k in range(len(rssi))}
     return {k:1 if k==0 else 0.05 for k in ks}
 def create_rssi(total_num):
     #rssi = create_network(range(3), range(3,12),1)
