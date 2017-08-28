@@ -17,7 +17,11 @@ def load_rssi(jsonified):
     return inted({k:inted(v) for k,v in j.items()})
 def load_px(jsonified):
     j = json.loads(jsonified)
-    return inted(j)
+    #to do - here read the size of the benchmarker
+    #then run it and scale everything by it. - need to ensure
+    #that jsonified is of the form: {91:{size:10, t:0.03}, ..
+    scaled_j = scale_proc(j)
+    return inted(scaled_j)
 @app.route('/solve', methods=['POST'])
 def solve():
     code = request.form['code']
@@ -41,13 +45,13 @@ def solve_LP(code, rssi=None, proc=None):
     return solution
 
 def scale_proc(d):
-    """takes a list of dictionaries of the form [{node:91, size:10, t:0.03}]"""
-    sizes = set([i['size'] for i in d])
-    ref = {k:node_emulator.benchmark1(k)[0] for k in sizes}
+    """takes a list of dictionaries of the form {91:{size:10, t:0.03},.."""
+    sizes = set([v['size'] for k,v in d.items()])
+    ref = {k:node_emulator.benchmark1(size)[0] for size in sizes}
     def scale_d_item(d_item, ref):
         ref_time = ref[d_item['size']]
         return ref_time/d_item['t']
-    proc = {k['node']: scale_d_item(k, ref) for k in d}
+    proc = {k: scale_d_item(v, ref) for k,v in d.items()}
     return proc
 
 
