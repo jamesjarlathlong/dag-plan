@@ -39,6 +39,7 @@ def benchmark1(size):
     v = np.Vector(*vec(size))
     res = v.gen_matrix_mult(mat)
     return 
+
 benchmark1(10)
 
 class Node:
@@ -64,7 +65,7 @@ class Node:
         yield from asyncio.sleep(0)
         return trimmed
     def testaccel(self, sample_length):
-        fname = 'app/192.168.123.99.json'
+        fname = '../app/192.168.123.99.json'
         print('opening: ',fname)
         with open(fname) as json_data:
             d = json.loads(json_data.read())
