@@ -9,15 +9,16 @@ from collections import defaultdict
 from app import np
 import random as urandom
 import asyncio
+import multiprocessing as mp
 def argmax(complex_list):
     abs_list = map(abs, complex_list)
     idx = abs_list.index(max(abs_list))
     return idx,complex_list[idx]
 def timeit(method):
     def timed(*args, **kw):
-        ts = time.time()
+        ts = time.clock()
         result = method(*args, **kw)
-        te = time.time()
+        te = time.clock()
         ex_time = te-ts
         return ex_time,result
     return timed
@@ -30,17 +31,34 @@ def time_s(method):
         ex_time = te-ts
         return ex_time,res
     return timed
-
-@timeit
-def benchmark1(size):
+def async_method(method):
+    def asynced(*args, **kw):
+        pool = mp.Pool(processes=1)
+        res = pool.starmap(method, [args])[0]
+        return res
+    return asynced
+def bm1(size):
     def vec(size):
         return [urandom.getrandbits(8)/100 for i in range(size)]    
     mat = (vec(size) for i in range(size))
     v = np.Vector(*vec(size))
     res = v.gen_matrix_mult(mat)
     return 
-
-benchmark1(10)
+def bm2(size):
+    def vec(size):
+        return [urandom.getrandbits(8)/100 for i in range(size)]    
+    mat = (vec(size) for i in range(size))
+    res = np.pagerank(mat)
+    return
+def bm3(size):
+    def vec(size):
+       return [urandom.getrandbits(8)/100 for i in range(size)]    
+    v = vec(size)
+    ft = np.fft(v)
+    return
+benchmark1 = timeit(async_method(bm1))
+benchmark2 = timeit(async_method(bm2))
+benchmark3 = timeit(async_method(bm3))
 
 class Node:
     def __init__(self,num):
@@ -65,7 +83,11 @@ class Node:
         yield from asyncio.sleep(0)
         return trimmed
     def testaccel(self, sample_length):
+<<<<<<< HEAD
         fname = '../app/192.168.123.99.json'
+=======
+        fname = '/home/jjlong/dag-plan/app/192.168.123.99.json'
+>>>>>>> 32e7b259aa4dc8b531d84e88b665d4eb01116468
         print('opening: ',fname)
         with open(fname) as json_data:
             d = json.loads(json_data.read())
