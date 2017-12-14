@@ -120,14 +120,16 @@ def find_comm_cost(graph, rssi, a_dummy):
     child_node_name = a_dummy.edge[1]
     child_node_idx = int(child_node_name.split('_')[1])
     comm_size = parent_node['edge_w'].get(child_node_idx,0)
-    reverse = rssi[child].get(parent,1e9)
+    reverse = rssi[child].get(parent,1e3)
     comm_cost_next = comm_size*rssi[parent].get(child,reverse) #'rssi' gives time per byte - if no route and no reverse just make very large
     return comm_cost_next
 def find_comp_cost(graph, processors, a_dummy):
+    """comp cost for an edge is the computational load of the parent task
+    scaled by the speed of the proposed parent node"""
     parent_node = graph[a_dummy.edge[0]]
     parent = a_dummy.parent
-    parent_type = get_stage(a_dummy)
-    speed = 1 if parent_type == 'M' else processors[parent]
+    child_type = get_stage(a_dummy)
+    speed = 1 if child_type == 'M' else processors[parent]
     comp_cost = parent_node['node_w']/speed
     return comp_cost
 def find_cost(graph, processors, rssi, a_dummy):
