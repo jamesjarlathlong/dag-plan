@@ -22,6 +22,15 @@ def timeit(method):
         ex_time = te-ts
         return ex_time,result
     return timed
+def avg_time(num_runs, method):
+    def timed(*args, **kw):
+        ts = time.clock()
+        results = [method(*args, **kw) for i in range(num_runs)]
+        te = time.clock()
+        ex_time = (te-ts)/num_runs
+        return ex_time, results[0]
+    return timed
+three_timer = functools.partial(avg_time, 3)
 def time_s(method):
     def timed(*args, **kw):
         l = asyncio.get_event_loop()
@@ -35,6 +44,8 @@ def async_method(method):
     def asynced(*args, **kw):
         pool = mp.Pool(processes=1)
         res = pool.starmap(method, [args])[0]
+        pool.close()
+        pool.join()
         return res
     return asynced
 def bm1(size):
@@ -42,29 +53,37 @@ def bm1(size):
         return [urandom.getrandbits(8)/100 for i in range(size)]    
     mat = (vec(size) for i in range(size))
     v = np.Vector(*vec(size))
-    res = v.gen_matrix_mult(mat)
-    return 
+    t, res = three_timer(v.gen_matrix_mult)(mat)
+    return t, res
 def bm2(size):
     def vec(size):
         return [urandom.getrandbits(8)/100 for i in range(size)]    
-    mat = (vec(size) for i in range(size))
-    res = np.pagerank(mat)
-    return
+    mat = [vec(size) for i in range(size)]
+    t, res = three_timer(np.pagerank)(mat)
+    return t, res
 def bm3(size):
     def vec(size):
        return [urandom.getrandbits(8)/100 for i in range(size)]    
     v = vec(size)
-    ft = np.fft(v)
-    return
-benchmark1 = timeit(async_method(bm1))
-benchmark2 = timeit(async_method(bm2))
-benchmark3 = timeit(async_method(bm3))
-
+    t, res = three_timer(np.fft)(v)
+    return t, res
+def bm4(size):
+    def internal(size):
+        if size<2:
+            return size
+        else:
+            return bm4(size-1)+bm4(size-2)
+    t, res = three_timer(internal)(size)
+benchmark1 = async_method(bm1)
+benchmark2 = async_method(bm2)
+benchmark3 = async_method(bm3)
+benchmark4 = async_method(bm4)
+"""TODO - problem is that we are also counting the time to sample the fake data
+for the benchmarks"""
 class Node:
     def __init__(self,num):
         self.ID = num
         self.np = np
-        print('called emulator!!',np)
     def accelpacketyielder(self):
         return [random.uniform(-2,2) for i in range(120)]
     def accel(self, sample_length):
@@ -83,11 +102,7 @@ class Node:
         yield from asyncio.sleep(0)
         return trimmed
     def testaccel(self, sample_length):
-<<<<<<< HEAD
-        fname = '../app/192.168.123.99.json'
-=======
-        fname = '/home/jjlong/dag-plan/app/192.168.123.99.json'
->>>>>>> 32e7b259aa4dc8b531d84e88b665d4eb01116468
+        fname = '/home/james/Dropbox (MIT)/All_Resourceful/dag_planner/dag-plan/app/192.168.123.99.json'
         print('opening: ',fname)
         with open(fname) as json_data:
             d = json.loads(json_data.read())
@@ -100,7 +115,7 @@ def run_sense(job_instance, node_idx, structure):
     node = Node(node_idx)
     time, data = time_s(execute_sampler)(job_instance.sampler, node)
     len_data = job_instance.l
-    sampling_time = (len_data+random.uniform(0,250))/2000 #Hz
+    sampling_time = (len_data+random.uniform(0,10))/2000 #Hz
     structure['S'][node_idx]['cost'] = 1000*sampling_time #milliseconds
     structure['S'][node_idx]['edge'][node_idx] = data
     return structure
@@ -115,6 +130,9 @@ def run_map(job_instance, node_idx, structure):
     node = Node(node_idx)
     data = structure['S'][node_idx]['edge'][node_idx]
     time, kvs = timeit(execute_mapper)(job_instance.mapper, node, data)
+    print('ran map: ', time, len(data[1]))
+    btime,k = benchmark3(256)
+    print('bmark: ', btime, k)
     sorted_kvs = sorted(kvs, key = lambda x:x[0])
     hasher = functools.partial(partition, job_instance.reducenodes)
     grouped_by_hash = {k:group_kvs_bykey(g) for k,g in itertools.groupby(sorted_kvs, hasher)}
