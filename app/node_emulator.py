@@ -10,6 +10,10 @@ from app import np
 import random as urandom
 import asyncio
 import multiprocessing as mp
+def hasher(i):
+    prev={'58z': 23762, '22x': 28829, '56x': 23582, '22z': 28831, '95y': 36400, '53z': 23673, '53y': 23674, '53x': 23675, '95x': 36401, '95z': 36403, '41x': 22520, '41y': 22521, '41z': 22522, '68x': 24915, '68y': 24914, '68z': 24913, '39x': 30263, '39y': 30262, '39z': 30261, '69z': 24944, '15y': 27704, '15x': 27705, '55y': 23612, '55x': 23613, '15z': 27707, '55z': 23615, '63x': 24504, '63y': 24505, '63z': 24506, '43x': 22458, '43y': 22459, '43z': 22456, '32x': 29852, '21z': 29052, '32y': 29853, '21x': 29054, '21y': 29055, '17x': 27899, '61z': 24696, '17y': 27898, '61x': 24698, '61y': 24699, '17z': 27897, '46x': 22559, '46y': 22558, '46z': 22557, '32z': 29854, '37x': 29945, '37y': 29944, '37z': 29947, '64z': 24797, '96z': 36368, '64x': 24799, '96x': 36370, '96y': 36371, '64y': 24798, '40x': 22489, '40y': 22488, '40z': 22491, '69x': 24946, '69y': 24947, '49x': 22768, '49y': 22769, '49z': 22770, '18x': 28116, '18y': 28117, '18z': 28118, '56z': 23580, '22y': 28828, '58x': 23760, '56y': 23583, '58y': 23761}
+    prevhash = prev.get(i, hash(i))
+    return prevhash
 def argmax(complex_list):
     abs_list = map(abs, complex_list)
     idx = abs_list.index(max(abs_list))
@@ -48,6 +52,18 @@ def async_method(method):
         pool.join()
         return res
     return asynced
+def slowdown(n=1):
+        def decorator(func):
+            def wrapper(*args,**kw):
+                n=1
+                for i in range(n):
+                    try:
+                        res = [i for i in func(*args,**kw)]
+                    except TypeError as e:
+                        print('wasnt iterable, who cares')
+                return func(*args, **kw)
+            return wrapper
+        return decorator
 def bm1(size):
     def vec(size):
         return [urandom.getrandbits(8)/100 for i in range(size)]    
@@ -102,7 +118,7 @@ class Node:
         yield from asyncio.sleep(0)
         return trimmed
     def testaccel(self, sample_length):
-        fname = '/home/james/Dropbox (MIT)/All_Resourceful/dag_planner/dag-plan/app/192.168.123.99.json'
+        fname = '/home/james/Dropbox (MIT)/All_Resourceful/dag_planner/dag-plan/app/192.168.123.31.json'
         print('opening: ',fname)
         with open(fname) as json_data:
             d = json.loads(json_data.read())
@@ -122,20 +138,18 @@ def run_sense(job_instance, node_idx, structure):
 def execute_mapper(mapper, node, data):
     return [(k,v) for k,v in mapper(node, data)]
 def partition(reducers, kv):
-    idx = hash(kv[0]) % len(reducers)
+    idx = hasher(kv[0]) % len(reducers)
     return idx
 def group_kvs_bykey(kvs):
-    return {k:[i[1] for i in pairs] for k,pairs in itertools.groupby(kvs, lambda x:x[0])}
+    return {k:[i for i in pairs] for k,pairs in itertools.groupby(kvs, lambda x:x[0])}
 def run_map(job_instance, node_idx, structure):
     node = Node(node_idx)
     data = structure['S'][node_idx]['edge'][node_idx]
     time, kvs = timeit(execute_mapper)(job_instance.mapper, node, data)
-    print('ran map: ', time, len(data[1]))
     btime,k = benchmark3(256)
-    print('bmark: ', btime, k)
     sorted_kvs = sorted(kvs, key = lambda x:x[0])
     hasher = functools.partial(partition, job_instance.reducenodes)
-    grouped_by_hash = {k:group_kvs_bykey(g) for k,g in itertools.groupby(sorted_kvs, hasher)}
+    grouped_by_hash = {k:list(g) for k,g in itertools.groupby(sorted_kvs, hasher)}
     structure['M'][node_idx]['cost'] = 1000*time #milliseconds
     for target, data in grouped_by_hash.items():
         structure['M'][node_idx]['edge'][target] = data
@@ -144,22 +158,22 @@ def just_existing_values(d):
     return {k:v for k,v in d.items() if v}
 def not_none(lst):
     return [i for i in lst if i is not None]
-def merge_dicts_of_lists(d1, d2):
-    d = d1.copy()
-    dd = defaultdict(list,d)
-    for i,j in d2.items():
-        dd[i].extend(j)
-    return dict(dd)
+
 def get_in_data(structure, reducenode):
     map_struct = deepcopy(structure['M'])
     all_kvs = [map_struct[i]['edge'] for i in range(len(map_struct))]
     all_existing = [just_existing_values(d) for d in all_kvs]
-    for_reduce_node = not_none([i.get(reducenode) for i in all_existing])
-    return functools.reduce(merge_dicts_of_lists, for_reduce_node) 
+    each_mappers_contribution = not_none([i.get(reducenode) for i in all_existing]) #to this reduce node
+    flattened = itertools.chain(*each_mappers_contribution)
+    srted = sorted(flattened, key =lambda x:x[0])
+    grouped = {k:list(g) for k,g in itertools.groupby(srted, key = lambda x:x[0])}
+    just_vals = {k:[kv[1] for kv in v] for k, v in grouped.items()}
+    return just_vals
 def execute_reducer(reducer, in_data):
     return [list(reducer(k,vs)) for k,vs in in_data.items()]
 def run_reduce(job_instance, node_idx, structure):
     in_data = get_in_data(structure, node_idx)
+    print(node_idx, ',',in_data)
     reduce_func = functools.partial(job_instance.reducer, node_idx)
     time, out_data = timeit(execute_reducer)(reduce_func, in_data)
     structure['R'][node_idx]['cost']= 1000*time #milliseconds
@@ -185,11 +199,14 @@ def get_profile_structure(job_instance):
 def run_all(run_func, job_instance, nodes, structure):
     add_sensers = helper.pipe(*[functools.partial(run_func, job_instance, i) for i in range(len(nodes))])
     return add_sensers(structure)
+def float_json(data):
+    return json.dumps(data,separators=(',',':'))
 def convert_to_lengths(final_struct):
+    print('final_struct: ', final_struct['M'])
     for k,v in final_struct.items():
         for node, values in v.items():
             for target_node, msg in values['edge'].items():
-                msg_length = len(json.dumps(msg,separators=(',',':'))) if msg else 0
+                msg_length = len(float_json(msg)) if msg else 0
                 values['edge'][target_node] = msg_length
     return final_struct
 def job_profiler(job_instance):

@@ -120,21 +120,31 @@ def find_comm_cost(graph, rssi, a_dummy):
     child_node_name = a_dummy.edge[1]
     child_node_idx = int(child_node_name.split('_')[1])
     comm_size = parent_node['edge_w'].get(child_node_idx,0)
-    reverse = rssi[child].get(parent,1e3)
-    comm_cost_next = comm_size*rssi[parent].get(child,reverse) #'rssi' gives time per byte - if no route and no reverse just make very large
+    try:
+        comm_strength = rssi[parent].get(child)
+        if not (comm_strength):
+            comm_strength = rssi[child][parent]
+        comm_cost_next = comm_size*comm_strength
+    except Exception as e:
+        msg = 'coudlnt calc cost,\n {},\n {}'.format(rssi.get(parent), rssi.get(child))
+        raise(Exception(msg))
+    #comm_cost_next = comm_size*rssi[parent].get(child,reverse)
     return comm_cost_next
 def find_comp_cost(graph, processors, a_dummy):
     """comp cost for an edge is the computational load of the parent task
     scaled by the speed of the proposed parent node"""
     parent_node = graph[a_dummy.edge[0]]
+    num_childers = len(parent_node['children'])
     parent = a_dummy.parent
     child_type = get_stage(a_dummy)
     speed = 1 if child_type == 'M' else processors[parent]
-    comp_cost = parent_node['node_w']/speed
+    comp_cost = (parent_node['node_w']/num_childers)/speed
     return comp_cost
 def find_cost(graph, processors, rssi, a_dummy):
     """node is a key value pair, assignments is a named tuple"""
-    return find_comp_cost(graph, processors, a_dummy)+find_comm_cost(graph, rssi, a_dummy)
+    comp = find_comp_cost(graph, processors, a_dummy)
+    comm = find_comm_cost(graph, rssi, a_dummy)
+    return comp+comm
 def edge_uniqueness(problem, dummies, dummy_vars):
     """given all possible dummy variable assignments
     and the ILP problem, create the constraints that 
@@ -211,6 +221,8 @@ def formulate_LP(graph, constraints, processors, rssi):
     bottleneck_cost_calculator = functools.partial(calculate_bottleneck_cost, graph, rssi)
     bottleneck_costs = add_bottleneck_dummies(problem, bottleneck_dummies, bottleneck_vars, bottleneck_cost_calculator)
     problem = cost_adder(problem, combine_costs(edge_costs, bottleneck_costs))
+    #print('edge costs: ', edge_costs)
+    #problem = cost_adder(problem, edge_costs)
     problem = constrain_bottlenecks(bottleneck_vars, dummy_vars, problem, bottleneck_dummies)
     problem = edge_uniqueness(problem, d, dummy_vars)
     problem = inout_consistency(graph, d, problem, dummy_vars)
@@ -259,10 +271,11 @@ solution_pipe = helper.pipe(formulate_LP, solver, output)
 def tr(rssi):
     sub_dict = lambda d: {k:round(v,2) for k,v in d.items()}
     return {k:sub_dict(v) for k,v in rssi.items()}
-def solve_DAG(code, rssi, processors):
+def solve_DAG(code, rssi, processors, ack, bw=None):
     graph = dag_former.generate_weighted_graph(code)
     constraints = dag_former.generate_constraints(code, graph)
-    bw = bandwidth.get_full_bw(rssi)
+    if not bw:
+        bw = bandwidth.get_full_bw(rssi,ack=ack)
     solution,time = solution_pipe(graph, constraints, processors, bw)
-    return {'sol':solution,'graph':graph,'bw':tr(bw),'px':processors,'totaltime':time}#add graph and bw for reconstruction
+    return {'sol':solution,'graph':graph,'bw':tr(bw),'px':processors,'totaltime':time,'ack':ack}#add graph and bw for reconstruction
 

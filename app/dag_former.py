@@ -1,6 +1,7 @@
 import functools
 import app.helper as helper
 from app.node_emulator import job_profiler
+from app.node_emulator import slowdown
 import time
 from app import np
 from app import basis_pursuit as bp
