@@ -118,7 +118,8 @@ class Node:
         yield from asyncio.sleep(0)
         return trimmed
     def testaccel(self, sample_length):
-        fname = '/home/jjlong/dag_planner/dag-plan/app/192.168.123.31.json'
+        #fname = '/home/jjlong/dag_planner/dag-plan/app/192.168.123.31.json'
+        fname = '/home/james/Dropbox (MIT)/All_Resourceful/dag_planner/dag-plan/app/192.168.123.31.json'
         print('opening: ',fname)
         with open(fname) as json_data:
             d = json.loads(json_data.read())
