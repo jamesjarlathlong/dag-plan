@@ -90,10 +90,10 @@ def bm4(size):
         else:
             return bm4(size-1)+bm4(size-2)
     t, res = three_timer(internal)(size)
-benchmark1 = async_method(bm1)
-benchmark2 = async_method(bm2)
-benchmark3 = async_method(bm3)
-benchmark4 = async_method(bm4)
+benchmark1 = bm1#async_method(bm1)
+benchmark2 = bm2##async_method(bm2)
+benchmark3 = bm3#async_method(bm3)
+benchmark4 = bm4#async_method(bm4)
 """TODO - problem is that we are also counting the time to sample the fake data
 for the benchmarks"""
 class Node:
@@ -118,7 +118,7 @@ class Node:
         yield from asyncio.sleep(0)
         return trimmed
     def testaccel(self, sample_length):
-        fname = '/home/james/Dropbox (MIT)/All_Resourceful/dag_planner/dag-plan/app/192.168.123.31.json'
+        fname = '/home/jjlong/dag_planner/dag-plan/app/192.168.123.31.json'
         print('opening: ',fname)
         with open(fname) as json_data:
             d = json.loads(json_data.read())
