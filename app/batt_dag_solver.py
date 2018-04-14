@@ -10,6 +10,7 @@ import app.helper as helper
 import app.np as np
 import app.dag_former as dag_former
 import app.bandwidth_calculator as bandwidth
+import math
 def to_battery(active_mA,t):
     #takes the active milliAmp consumption
     #rate and for and an active time
@@ -22,7 +23,7 @@ def timecost_to_battcost(time):
     return to_battery(active_draw, time)
 def cost_finder_to_batt(costfinder,batteries, a_dummy):
     cost = costfinder(a_dummy)
-    battery = batteries[a_dummy.parent]
+    battery = batteries[str(a_dummy.parent)]
     return costfinder(a_dummy)/battery
 def find_communication_power(a, b, rssi):
     """a and b are the names of processor"""
@@ -140,12 +141,13 @@ def find_comm_cost(graph, rssi, a_dummy):
         comm_strength = rssi[parent].get(child)
         if not (comm_strength):
             comm_strength = rssi[child][parent]
-        comm_cost_next = comm_size*comm_strength
+        #comm_cost_next = comm_size*comm_strength
     except Exception as e:
         msg = 'coudlnt calc cost,\n {},\n {}'.format(rssi.get(parent), rssi.get(child))
-        raise(Exception(msg))
+        #raise(Exception(msg))
+        comm_strength = math.inf
     #comm_cost_next = comm_size*rssi[parent].get(child,reverse)
-    return comm_cost_next
+    return comm_size*comm_strength
 
 def find_comp_cost(graph, processors, a_dummy):
     """comp cost for an edge is the computational load of the parent task
@@ -161,8 +163,8 @@ def find_cost(graph,batteries, processors, rssi, a_dummy):
     """node is a key value pair, assignments is a named tuple"""
     compfinder = functools.partial(find_comp_cost,graph, processors)
     commfinder = functools.partial(find_comm_cost, graph, rssi)
-    return (cost_finder_to_batt(compfinder, a_dummy)
-            +cost_finder_to_batt(commfinder, a_dummy))
+    return (cost_finder_to_batt(compfinder,batteries, a_dummy)
+            +cost_finder_to_batt(commfinder,batteries, a_dummy))
 def edge_uniqueness(problem, dummies, dummy_vars):
     """given all possible dummy variable assignments
     and the ILP problem, create the constraints that 
