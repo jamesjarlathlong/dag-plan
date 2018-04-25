@@ -10,6 +10,16 @@ import app.helper as helper
 import app.np as np
 import app.dag_former as dag_former
 import app.bandwidth_calculator as bandwidth
+from app.node_emulator import timeit
+def timenameit(method):
+    def timed(*args, **kw):
+        ts = time.clock()
+        result = method(*args, **kw)
+        te = time.clock()
+        ex_time = te-ts
+        print(ex_time, method.__name__)
+        return result
+    return timed
 def find_communication_power(a, b, rssi):
     """a and b are the names of processor"""
     return rssi[a][b]
@@ -124,12 +134,13 @@ def find_comm_cost(graph, rssi, a_dummy):
         comm_strength = rssi[parent].get(child)
         if not (comm_strength):
             comm_strength = rssi[child][parent]
-        comm_cost_next = comm_size*comm_strength
+        #comm_cost_next = comm_size*comm_strength
     except Exception as e:
         msg = 'coudlnt calc cost,\n {},\n {}'.format(rssi.get(parent), rssi.get(child))
-        raise(Exception(msg))
+        #raise(Exception(msg))
+        comm_strength = 1e9
     #comm_cost_next = comm_size*rssi[parent].get(child,reverse)
-    return comm_cost_next
+    return comm_size*comm_strength
 def find_comp_cost(graph, processors, a_dummy):
     """comp cost for an edge is the computational load of the parent task
     scaled by the speed of the proposed parent node"""
@@ -271,11 +282,12 @@ solution_pipe = helper.pipe(formulate_LP, solver, output)
 def tr(rssi):
     sub_dict = lambda d: {k:round(v,2) for k,v in d.items()}
     return {k:sub_dict(v) for k,v in rssi.items()}
+@timenameit
 def solve_DAG(code, rssi, processors, ack, bw=None):
-    graph = dag_former.generate_weighted_graph(code)
-    constraints = dag_former.generate_constraints(code, graph)
+    graph, constraints = dag_former.generate_graph_and_constraints(code)
     if not bw:
         bw = bandwidth.get_full_bw(rssi,ack=ack)
     solution,time = solution_pipe(graph, constraints, processors, bw)
+    print('px reg: ', processors)
     return {'sol':solution,'graph':graph,'bw':tr(bw),'px':processors,'totaltime':time,'ack':ack}#add graph and bw for reconstruction
 

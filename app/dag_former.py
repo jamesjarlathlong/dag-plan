@@ -64,7 +64,6 @@ def define_the_class(code):
 def get_weights(code_class):
     code_instance = code_class
     weights = job_profiler(code_instance)
-    print('weights: ', weights)
     return weights
 def add_weights_to_graph(weights_structure, graph):
     weights_structure['K'] = {0:{'cost':0, 'edge':{}}}
@@ -81,4 +80,9 @@ def generate_weighted_graph(code):
     weight_adder = functools.partial(add_weights_to_graph, get_weights(code_class))
     full_graph_pipe = helper.pipe(generate_graph_structure, weight_adder)
     return full_graph_pipe(code_class)
+@functools.lru_cache(maxsize=1024)
+def generate_graph_and_constraints(code):
+    graph = generate_weighted_graph(code)
+    constraints = generate_constraints(code, graph)
+    return graph, constraints
 

@@ -8,9 +8,19 @@ import time
 import random
 import app.helper as helper
 import app.np as np
+import numpy
 import app.dag_former as dag_former
 import app.bandwidth_calculator as bandwidth
 import math
+def timenameit(method):
+    def timed(*args, **kw):
+        ts = time.clock()
+        result = method(*args, **kw)
+        te = time.clock()
+        ex_time = te-ts
+        print(ex_time, method.__name__)
+        return result
+    return timed
 def to_battery(active_mA,t):
     #takes the active milliAmp consumption
     #rate and for and an active time
@@ -145,7 +155,7 @@ def find_comm_cost(graph, rssi, a_dummy):
     except Exception as e:
         msg = 'coudlnt calc cost,\n {},\n {}'.format(rssi.get(parent), rssi.get(child))
         #raise(Exception(msg))
-        comm_strength = math.inf
+        comm_strength = 1e9
     #comm_cost_next = comm_size*rssi[parent].get(child,reverse)
     return comm_size*comm_strength
 
@@ -291,11 +301,12 @@ solution_pipe = helper.pipe(formulate_LP, solver, output)
 def tr(rssi):
     sub_dict = lambda d: {k:round(v,2) for k,v in d.items()}
     return {k:sub_dict(v) for k,v in rssi.items()}
+@timenameit
 def solve_batt_DAG(code, rssi, processors,batteries, ack, bw=None):
-    graph = dag_former.generate_weighted_graph(code)
-    constraints = dag_former.generate_constraints(code, graph)
+    graph, constraints = dag_former.generate_graph_and_constraints(code)
     if not bw:
         bw = bandwidth.get_full_bw(rssi,ack=ack)
     solution,time = solution_pipe(graph, constraints, processors, bw, batteries)
+    print('px: ',processors)
     return {'sol':solution,'graph':graph,'bw':tr(bw),'px':processors,'totaltime':time,'ack':ack}#add graph and bw for reconstruction
 

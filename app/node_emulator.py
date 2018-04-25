@@ -120,7 +120,6 @@ class Node:
     def testaccel(self, sample_length):
         #fname = '/home/jjlong/dag_planner/dag-plan/app/192.168.123.31.json'
         fname = '/home/james/Dropbox (MIT)/All_Resourceful/dag_planner/dag-plan/app/192.168.123.31.json'
-        print('opening: ',fname)
         with open(fname) as json_data:
             d = json.loads(json_data.read())
             yield from asyncio.sleep(0)
@@ -174,7 +173,6 @@ def execute_reducer(reducer, in_data):
     return [list(reducer(k,vs)) for k,vs in in_data.items()]
 def run_reduce(job_instance, node_idx, structure):
     in_data = get_in_data(structure, node_idx)
-    print(node_idx, ',',in_data)
     reduce_func = functools.partial(job_instance.reducer, node_idx)
     time, out_data = timeit(execute_reducer)(reduce_func, in_data)
     structure['R'][node_idx]['cost']= 1000*time #milliseconds
@@ -203,7 +201,6 @@ def run_all(run_func, job_instance, nodes, structure):
 def float_json(data):
     return json.dumps(data,separators=(',',':'))
 def convert_to_lengths(final_struct):
-    print('final_struct: ', final_struct['M'])
     for k,v in final_struct.items():
         for node, values in v.items():
             for target_node, msg in values['edge'].items():
